@@ -5983,6 +5983,9 @@ com_soundLib_SoundManager.playMusic = function(soundName,loop) {
 		}
 	}
 };
+com_soundLib_SoundManager.muteSound = function() {
+	com_soundLib_SoundManager.soundMuted = true;
+};
 com_soundLib_SoundManager.muteMusic = function() {
 	com_soundLib_SoundManager.musicMuted = true;
 	if(com_soundLib_SoundManager.music != null) {
@@ -5994,6 +5997,9 @@ com_soundLib_SoundManager.musicVolume = function(vol) {
 	if(com_soundLib_SoundManager.music != null) {
 		com_soundLib_SoundManager.music.set_volume(vol);
 	}
+};
+com_soundLib_SoundManager.unMuteSound = function() {
+	com_soundLib_SoundManager.soundMuted = false;
 };
 com_soundLib_SoundManager.unMuteMusic = function() {
 	com_soundLib_SoundManager.musicMuted = false;
@@ -6064,7 +6070,7 @@ gameObjects_Ball.prototype = $extend(com_framework_utils_Entity.prototype,{
 		com_framework_utils_Entity.prototype.update.call(this,dt);
 		this.time += dt;
 		this.velocity.y += 500 * dt;
-		if(this.collision.x < 0 || this.collision.x + this.collision.width > this.screenWidth) {
+		if(this.collision.x < 5 || this.collision.x + this.collision.width > this.screenWidth) {
 			this.velocity.x *= -1;
 		}
 		this.collision.x += this.velocity.x * dt;
@@ -6436,10 +6442,12 @@ gameObjects_SoundController.prototype = {
 		if(com_framework_utils_Input.i.isKeyCodePressed(77)) {
 			if(this.music) {
 				com_soundLib_SoundManager.muteMusic();
+				com_soundLib_SoundManager.muteSound();
 				soundIcon.colorMultiplication(1,0,0,1);
 				this.music = false;
 			} else {
 				com_soundLib_SoundManager.unMuteMusic();
+				com_soundLib_SoundManager.unMuteSound();
 				soundIcon.colorMultiplication(1,1,1,1);
 				this.music = true;
 			}
@@ -8120,7 +8128,7 @@ var kha__$Assets_ImageList = function() {
 	this.naviDescription = { name : "navi", original_height : 50, file_sizes : [8819], original_width : 250, files : ["navi.png"], type : "image"};
 	this.naviName = "navi";
 	this.navi = null;
-	this.malePlayerDescription = { name : "malePlayer", original_height : 327, file_sizes : [33061], original_width : 381, files : ["malePlayer.png"], type : "image"};
+	this.malePlayerDescription = { name : "malePlayer", original_height : 327, file_sizes : [35809], original_width : 381, files : ["malePlayer.png"], type : "image"};
 	this.malePlayer = null;
 	this.hey_listenDescription = { name : "hey_listen", original_height : 98, file_sizes : [10014], original_width : 221, files : ["hey listen.png"], type : "image"};
 	this.hey_listenName = "hey_listen";
@@ -8130,7 +8138,7 @@ var kha__$Assets_ImageList = function() {
 	this.forestDescription = { name : "forest", original_height : 720, file_sizes : [64059], original_width : 500, files : ["forest.jpg"], type : "image"};
 	this.forestName = "forest";
 	this.forest = null;
-	this.femalePlayerDescription = { name : "femalePlayer", original_height : 327, file_sizes : [28328], original_width : 381, files : ["femalePlayer.png"], type : "image"};
+	this.femalePlayerDescription = { name : "femalePlayer", original_height : 327, file_sizes : [31095], original_width : 381, files : ["femalePlayer.png"], type : "image"};
 	this.femalePlayer = null;
 	this.ballDescription = { name : "ball", original_height : 40, file_sizes : [469], original_width : 40, files : ["ball.png"], type : "image"};
 	this.ballName = "ball";
@@ -8208,9 +8216,9 @@ kha__$Assets_SoundList.prototype = {
 	,__class__: kha__$Assets_SoundList
 };
 var kha__$Assets_BlobList = function() {
-	this.malePlayer_xmlDescription = { name : "malePlayer_xml", file_sizes : [3486], files : ["malePlayer.xml"], type : "blob"};
+	this.malePlayer_xmlDescription = { name : "malePlayer_xml", file_sizes : [3612], files : ["malePlayer.xml"], type : "blob"};
 	this.malePlayer_xml = null;
-	this.femalePlayer_xmlDescription = { name : "femalePlayer_xml", file_sizes : [3359], files : ["femalePlayer.xml"], type : "blob"};
+	this.femalePlayer_xmlDescription = { name : "femalePlayer_xml", file_sizes : [3485], files : ["femalePlayer.xml"], type : "blob"};
 	this.femalePlayer_xml = null;
 };
 $hxClasses["kha._Assets.BlobList"] = kha__$Assets_BlobList;
@@ -21213,7 +21221,6 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	}
 	,powerUpVsPlayer: function(aPowerUp,aPlayerChar) {
 		var powerUp = aPowerUp.userData;
-		haxe_Log.trace(powerUp.get_powerUpType() + " power up type",{ fileName : "states/GameState.hx", lineNumber : 207, className : "states.GameState", methodName : "powerUpVsPlayer"});
 		if(powerUp.get_powerUpType() > 6) {
 			this.playerChar.add_damage();
 		} else {
@@ -21259,6 +21266,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	,__class__: states_GameState
 });
 var states_IntroScreen = function() {
+	this.selected = false;
 	this.transcparency = 0;
 	this.more = false;
 	this.isDrawn = false;
@@ -21279,11 +21287,10 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		atlas.add(new com_loading_basicResources_FontLoader(kha_Assets.fonts.MiddleAgesName,30));
 		atlas.add(new com_loading_basicResources_SpriteSheetLoader(kha_Assets.images.naviName,50,47,0,[new com_loading_basicResources_Sequence("Idle",[0,1,2,3,4])]));
 		resources.add(new com_loading_basicResources_ImageLoader(kha_Assets.images.titleName));
-		resources.add(new com_loading_basicResources_SoundLoader("background"));
 		resources.add(atlas);
 	}
-	,femaleCharacter: null
-	,maleCharacter: null
+	,lila: null
+	,hans: null
 	,simulationLayer: null
 	,selectCharacter: null
 	,selectedCharacter: null
@@ -21295,7 +21302,34 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 	,pressStart: null
 	,soundIcon: null
 	,soundControll: null
+	,selectedBg: null
+	,topLine: null
+	,leftLine: null
+	,rightLine: null
+	,bottomLine: null
+	,createSelectedBg: function() {
+		this.selectedBg = new com_gEngine_helper_RectangleDisplay();
+		this.topLine = new com_gEngine_helper_RectangleDisplay();
+		this.leftLine = new com_gEngine_helper_RectangleDisplay();
+		this.rightLine = new com_gEngine_helper_RectangleDisplay();
+		this.bottomLine = new com_gEngine_helper_RectangleDisplay();
+		this.selectedBg.colorMultiplication(0.1,0.1,0.1,0.5);
+		this.selectedBg.scaleX = 0;
+		this.selectedBg.scaleY = 0;
+		this.selectedBg.y = 490;
+		this.topLine.colorMultiplication(1,0.823529411764705843,0,0.5);
+		this.leftLine.colorMultiplication(1,0.823529411764705843,0,0.5);
+		this.rightLine.colorMultiplication(1,0.823529411764705843,0,0.5);
+		this.bottomLine.colorMultiplication(1,0.823529411764705843,0,0.5);
+		this.topLine.scaleX = this.bottomLine.scaleX = 0;
+		this.topLine.scaleY = this.bottomLine.scaleY = 0;
+		this.leftLine.scaleX = this.rightLine.scaleX = 0;
+		this.leftLine.scaleY = this.rightLine.scaleY = 0;
+		this.leftLine.y = this.rightLine.y = this.topLine.y = 488;
+		this.bottomLine.y = 700;
+	}
 	,init: function() {
+		this.createSelectedBg();
 		this.soundIcon = new com_gEngine_display_Sprite(kha_Assets.images.naviName);
 		this.soundIcon.x = 470;
 		this.soundIcon.y = 690;
@@ -21313,18 +21347,18 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		this.title.x = tmp - tmp1;
 		this.title.y = 270;
 		this.stage.addChild(this.title);
-		this.maleCharacter = new com_gEngine_display_Sprite("malePlayer");
-		this.maleCharacter.x = 55.5555555555555571;
-		this.maleCharacter.y = 490;
-		this.maleCharacter.scaleX = 3;
-		this.maleCharacter.scaleY = 3;
-		this.maleCharacter.timeline.playAnimation("walk_",true);
-		this.femaleCharacter = new com_gEngine_display_Sprite("femalePlayer");
-		this.femaleCharacter.x = 277.777777777777771;
-		this.femaleCharacter.y = 490;
-		this.femaleCharacter.scaleX = 3;
-		this.femaleCharacter.scaleY = 3;
-		this.femaleCharacter.timeline.playAnimation("walk_",true);
+		this.hans = new com_gEngine_display_Sprite("malePlayer");
+		this.hans.x = 55.5555555555555571;
+		this.hans.y = 485;
+		this.hans.scaleX = 3;
+		this.hans.scaleY = 3;
+		this.hans.timeline.playAnimation("walk_",true);
+		this.lila = new com_gEngine_display_Sprite("femalePlayer");
+		this.lila.x = 277.777777777777771;
+		this.lila.y = 485;
+		this.lila.scaleX = 3;
+		this.lila.scaleY = 3;
+		this.lila.timeline.playAnimation("walk_",true);
 		this.hudLayer = new com_gEngine_display_StaticLayer();
 		this.stage.addChild(this.hudLayer);
 		this.selectCharacter = new com_gEngine_display_Text(kha_Assets.fonts.MiddleAgesName);
@@ -21335,28 +21369,34 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		this.male = new com_gEngine_display_Text(kha_Assets.fonts.MiddleAgesName);
 		this.female = new com_gEngine_display_Text(kha_Assets.fonts.MiddleAgesName);
 		this.male.set_text("Hans");
-		this.male.y = 660;
+		this.male.y = 670;
 		this.male.x = 105;
 		this.female.set_text("Lila");
-		this.female.y = 660;
+		this.female.y = 670;
 		this.female.x = 335;
 		this.pressStart = new com_gEngine_display_Text(kha_Assets.fonts.MiddleAgesName);
 		this.pressStart.set_text("press enter to play");
 		this.pressStart.y = 660;
 		var tmp3 = this.pressStart.width() / 2;
 		this.pressStart.x = 250 - tmp3;
-		this.femaleCharacter.timeline.frameRate = 0.1;
-		this.maleCharacter.timeline.frameRate = 0.1;
+		this.lila.timeline.frameRate = 0.1;
+		this.hans.timeline.frameRate = 0.1;
 		this.male.setColorMultiply(1,0.823529411764705843,0,1);
 		this.female.setColorMultiply(1,0.823529411764705843,0,1);
 		this.pressStart.setColorMultiply(1,0.823529411764705843,0,1);
 		this.selectCharacter.setColorMultiply(1,0.823529411764705843,0,1);
 		this.hudLayer.addChild(this.pressStart);
+		this.hudLayer.addChild(this.topLine);
+		this.hudLayer.addChild(this.leftLine);
+		this.hudLayer.addChild(this.bottomLine);
+		this.hudLayer.addChild(this.rightLine);
+		this.hudLayer.addChild(this.selectedBg);
 	}
 	,changeScreen: null
 	,isDrawn: null
 	,more: null
 	,transcparency: null
+	,selected: null
 	,update: function(dt) {
 		com_framework_utils_State.prototype.update.call(this,dt);
 		if(com_framework_utils_Input.i.isKeyCodePressed(81)) {
@@ -21371,71 +21411,135 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		if(this.changeScreen) {
 			if(this.title.y > 30) {
 				this.title.y -= 3;
-			} else if(!this.isDrawn) {
-				this.isDrawn = true;
-				this.simulationLayer.addChild(this.femaleCharacter);
-				this.simulationLayer.addChild(this.maleCharacter);
-				this.hudLayer.addChild(this.male);
-				this.hudLayer.addChild(this.female);
-				this.hudLayer.addChild(this.selectCharacter);
 			} else {
-				var tmp;
-				var tmp1;
-				var _this = com_framework_utils_Input.i;
-				if(_this.mousePosition.x * _this.screenScale.x > 60) {
-					var _this1 = com_framework_utils_Input.i;
-					tmp1 = _this1.mousePosition.x * _this1.screenScale.x < 190;
+				if(!this.isDrawn) {
+					this.isDrawn = true;
+					this.simulationLayer.addChild(this.lila);
+					this.simulationLayer.addChild(this.hans);
+					this.hudLayer.addChild(this.male);
+					this.hudLayer.addChild(this.female);
+					this.hudLayer.addChild(this.selectCharacter);
 				} else {
-					tmp1 = false;
-				}
-				if(tmp1) {
-					var _this2 = com_framework_utils_Input.i;
-					if(_this2.mousePosition.y * _this2.screenScale.y > 490) {
-						var _this3 = com_framework_utils_Input.i;
-						tmp = _this3.mousePosition.y * _this3.screenScale.y < 670;
+					if(com_framework_utils_Input.i.isKeyCodePressed(37)) {
+						this.selected = true;
+						this.selectedCharacter = "malePlayer";
+					}
+					if(com_framework_utils_Input.i.isKeyCodePressed(39)) {
+						this.selected = true;
+						this.selectedCharacter = "femalePlayer";
+					}
+					var tmp;
+					var tmp1;
+					var _this = com_framework_utils_Input.i;
+					if(_this.mousePosition.x * _this.screenScale.x > 60) {
+						var _this1 = com_framework_utils_Input.i;
+						tmp1 = _this1.mousePosition.x * _this1.screenScale.x < 190;
+					} else {
+						tmp1 = false;
+					}
+					if(tmp1) {
+						var _this2 = com_framework_utils_Input.i;
+						if(_this2.mousePosition.y * _this2.screenScale.y > 490) {
+							var _this3 = com_framework_utils_Input.i;
+							tmp = _this3.mousePosition.y * _this3.screenScale.y < 670;
+						} else {
+							tmp = false;
+						}
 					} else {
 						tmp = false;
 					}
-				} else {
-					tmp = false;
-				}
-				if(tmp) {
-					this.maleCharacter.timeline.playAnimation("attack_");
-					if(com_framework_utils_Input.i.isMousePressed()) {
+					if(tmp) {
+						this.selected = false;
 						this.selectedCharacter = "malePlayer";
-						this.startGame();
+						this.hans.timeline.playAnimation("attack_");
+						if(com_framework_utils_Input.i.isMousePressed()) {
+							this.startGame();
+						}
+					} else {
+						this.hans.timeline.playAnimation("walk_");
 					}
-				} else {
-					this.maleCharacter.timeline.playAnimation("walk_");
-				}
-				var tmp2;
-				var tmp3;
-				var _this4 = com_framework_utils_Input.i;
-				if(_this4.mousePosition.x * _this4.screenScale.x > 277.777777777777771) {
-					var _this5 = com_framework_utils_Input.i;
-					tmp3 = _this5.mousePosition.x * _this5.screenScale.x < 457.777777777777771;
-				} else {
-					tmp3 = false;
-				}
-				if(tmp3) {
-					var _this6 = com_framework_utils_Input.i;
-					if(_this6.mousePosition.y * _this6.screenScale.y > 490) {
-						var _this7 = com_framework_utils_Input.i;
-						tmp2 = _this7.mousePosition.y * _this7.screenScale.y < 670;
+					var tmp2;
+					var tmp3;
+					var _this4 = com_framework_utils_Input.i;
+					if(_this4.mousePosition.x * _this4.screenScale.x > 277.777777777777771) {
+						var _this5 = com_framework_utils_Input.i;
+						tmp3 = _this5.mousePosition.x * _this5.screenScale.x < 457.777777777777771;
+					} else {
+						tmp3 = false;
+					}
+					if(tmp3) {
+						var _this6 = com_framework_utils_Input.i;
+						if(_this6.mousePosition.y * _this6.screenScale.y > 490) {
+							var _this7 = com_framework_utils_Input.i;
+							tmp2 = _this7.mousePosition.y * _this7.screenScale.y < 670;
+						} else {
+							tmp2 = false;
+						}
 					} else {
 						tmp2 = false;
 					}
-				} else {
-					tmp2 = false;
-				}
-				if(tmp2) {
-					this.femaleCharacter.timeline.playAnimation("attack_");
-					if(com_framework_utils_Input.i.isMousePressed()) {
+					if(tmp2) {
+						this.selected = false;
 						this.selectedCharacter = "femalePlayer";
-						this.startGame();
+						if(com_framework_utils_Input.i.isMousePressed()) {
+							this.startGame();
+						}
+					} else {
+						this.lila.timeline.playAnimation("walk_");
 					}
-				} else {
-					this.femaleCharacter.timeline.playAnimation("walk_");
+					var tmp4;
+					var tmp5;
+					var tmp6;
+					var _this8 = com_framework_utils_Input.i;
+					if(_this8.mousePosition.x * _this8.screenScale.x > 60) {
+						var _this9 = com_framework_utils_Input.i;
+						tmp6 = _this9.mousePosition.x * _this9.screenScale.x < 190;
+					} else {
+						tmp6 = false;
+					}
+					if(tmp6) {
+						var _this10 = com_framework_utils_Input.i;
+						if(_this10.mousePosition.y * _this10.screenScale.y > 490) {
+							var _this11 = com_framework_utils_Input.i;
+							tmp5 = _this11.mousePosition.y * _this11.screenScale.y < 670;
+						} else {
+							tmp5 = false;
+						}
+					} else {
+						tmp5 = false;
+					}
+					if(!tmp5) {
+						var tmp7;
+						var tmp8;
+						var _this12 = com_framework_utils_Input.i;
+						if(_this12.mousePosition.x * _this12.screenScale.x > 277.777777777777771) {
+							var _this13 = com_framework_utils_Input.i;
+							tmp8 = _this13.mousePosition.x * _this13.screenScale.x < 457.777777777777771;
+						} else {
+							tmp8 = false;
+						}
+						if(tmp8) {
+							var _this14 = com_framework_utils_Input.i;
+							if(_this14.mousePosition.y * _this14.screenScale.y > 490) {
+								var _this15 = com_framework_utils_Input.i;
+								tmp7 = _this15.mousePosition.y * _this15.screenScale.y < 670;
+							} else {
+								tmp7 = false;
+							}
+						} else {
+							tmp7 = false;
+						}
+						tmp4 = !tmp7;
+					} else {
+						tmp4 = false;
+					}
+					if(tmp4 && !this.selected) {
+						this.selectedCharacter = "";
+					}
+					this.backgroundCharacter();
+				}
+				if(this.selectedCharacter != "" && com_framework_utils_Input.i.isKeyCodePressed(13) && this.changeScreen) {
+					this.startGame();
 				}
 			}
 		} else {
@@ -21452,6 +21556,34 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 	}
 	,sound: function() {
 		this.soundControll.soundControll(this.soundIcon);
+	}
+	,backgroundCharacter: function() {
+		this.selectedBg.scaleX = 140;
+		this.selectedBg.scaleY = 210;
+		this.topLine.scaleX = this.bottomLine.scaleX = 145;
+		this.topLine.scaleY = this.bottomLine.scaleY = 5;
+		this.leftLine.scaleX = this.rightLine.scaleX = 5;
+		this.leftLine.scaleY = this.rightLine.scaleY = 215;
+		if(this.selectedCharacter == "femalePlayer") {
+			this.hans.timeline.playAnimation("walk_");
+			this.selectedBg.x = 290;
+			this.topLine.x = this.leftLine.x = this.bottomLine.x = 288;
+			this.rightLine.x = 430;
+			this.lila.timeline.playAnimation("selected");
+		} else if(this.selectedCharacter == "malePlayer") {
+			this.lila.timeline.playAnimation("walk_");
+			this.selectedBg.x = 70;
+			this.topLine.x = this.leftLine.x = this.bottomLine.x = 68;
+			this.rightLine.x = 210;
+			this.hans.timeline.playAnimation("selected");
+		} else {
+			this.selectedBg.scaleX = 1;
+			this.selectedBg.scaleY = 1;
+			this.topLine.scaleX = this.bottomLine.scaleX = 0;
+			this.topLine.scaleY = this.bottomLine.scaleY = 0;
+			this.leftLine.scaleX = this.rightLine.scaleX = 0;
+			this.leftLine.scaleY = this.rightLine.scaleY = 0;
+		}
 	}
 	,startGame: function() {
 		var playerChar = new gameObjects_Player(250,650,this.selectedCharacter);
@@ -21563,7 +21695,7 @@ states_LoadingScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		if(this.allLoaded) {
 			com_framework_Simulation.i.set_manualLoad(true);
 			com_soundLib_SoundManager.playMusic("background");
-			com_soundLib_SoundManager.musicVolume(0.01);
+			com_soundLib_SoundManager.musicVolume(0.02);
 			this.startGame();
 		}
 	}
@@ -21573,6 +21705,7 @@ states_LoadingScreen.prototype = $extend(com_framework_utils_State.prototype,{
 	,__class__: states_LoadingScreen
 });
 var states_SuccessScreen = function(score,timeSurvived,sprite,playerStats,currentLevel) {
+	this.more = false;
 	this.time = 0;
 	com_framework_utils_State.call(this);
 	this.nextLevel = currentLevel + 1;
@@ -21587,6 +21720,7 @@ states_SuccessScreen.__super__ = com_framework_utils_State;
 states_SuccessScreen.prototype = $extend(com_framework_utils_State.prototype,{
 	score: null
 	,sprite: null
+	,pressContinue: null
 	,timeSurvived: null
 	,display: null
 	,simulationLayer: null
@@ -21606,28 +21740,45 @@ states_SuccessScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		this.stage.addChild(this.simulationLayer);
 		this.display = new com_gEngine_display_Sprite(this.sprite);
 		this.display.x = 170;
-		this.display.y = 505.;
+		this.display.y = 430.;
 		this.display.scaleX = 3;
 		this.display.scaleY = 3;
 		this.display.timeline.playAnimation("idle",false);
 		this.simulationLayer.addChild(this.display);
 		image.x = com_gEngine_GEngine.virtualWidth * 0.5 - image.width() * 0.5 / 2;
-		image.y = 100;
+		image.y = 70;
 		image.scaleX = 0.5;
 		image.scaleY = 0.5;
 		this.stage.addChild(image);
 		var scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
 		scoreDisplay.set_text("Your score is " + this.score);
 		scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - scoreDisplay.width() * 0.5 - 7;
-		scoreDisplay.y = com_gEngine_GEngine.virtualHeight / 2;
+		scoreDisplay.y = com_gEngine_GEngine.virtualHeight / 2 - 30;
 		scoreDisplay.set_color(-256);
 		this.stage.addChild(scoreDisplay);
+		this.pressContinue = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		this.pressContinue.set_text("press enter");
+		this.pressContinue.y = 660;
+		var tmp = this.pressContinue.width() / 2;
+		this.pressContinue.x = 250 - tmp;
+		this.stage.addChild(this.pressContinue);
 	}
+	,transcparency: null
+	,more: null
 	,update: function(dt) {
 		com_framework_utils_State.prototype.update.call(this,dt);
 		if(com_framework_utils_Input.i.isKeyCodePressed(13)) {
 			this.startNextLevel();
 		}
+		if(this.transcparency <= 0 || this.transcparency >= 1) {
+			this.more = !this.more;
+		}
+		if(this.more) {
+			this.transcparency += 0.025;
+		} else {
+			this.transcparency -= 0.025;
+		}
+		this.pressContinue.setColorMultiply(1,1,0,this.transcparency);
 	}
 	,startNextLevel: function() {
 		var playerChar = new gameObjects_Player(250,650,this.sprite);
