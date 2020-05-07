@@ -6194,6 +6194,7 @@ gameObjects_Gun.prototype = $extend(com_framework_utils_Entity.prototype,{
 	,__class__: gameObjects_Gun
 });
 var gameObjects_Player = function(X,Y,sprite) {
+	this.mouseMovment = false;
 	this.speed = 250;
 	com_framework_utils_Entity.call(this);
 	this.direction = new kha_math_FastVector2(0,1);
@@ -6233,6 +6234,7 @@ gameObjects_Player.prototype = $extend(com_framework_utils_Entity.prototype,{
 		this.speed = stats[0];
 		this.gun.set_damage(Math.ceil(stats[1]));
 	}
+	,mouseMovment: null
 	,update: function(dt) {
 		if(this.isDead()) {
 			return;
@@ -6241,8 +6243,11 @@ gameObjects_Player.prototype = $extend(com_framework_utils_Entity.prototype,{
 		com_framework_utils_Entity.prototype.update.call(this,dt);
 		this.collision.velocityX = 0;
 		this.collision.velocityY = 0;
+		if(com_framework_utils_Input.i.isKeyCodePressed(80)) {
+			this.mouseMovment = !this.mouseMovment;
+		}
 		this.movement(this.collision,this.speed);
-		if(com_framework_utils_Input.i.isKeyCodePressed(65)) {
+		if(com_framework_utils_Input.i.isKeyCodePressed(65) || com_framework_utils_Input.i.isMousePressed()) {
 			this.gun.shoot(this.get_x(),this.get_y() - this.get_height() * 0.75,0,-1);
 			this.display.offsetY = -15;
 			this.display.timeline.playAnimation("attack_",false);
@@ -6250,14 +6255,27 @@ gameObjects_Player.prototype = $extend(com_framework_utils_Entity.prototype,{
 	}
 	,movement: function(collision,speed) {
 		this.display.offsetY = -5;
-		if(com_framework_utils_Input.i.isKeyCodeDown(37)) {
-			if(collision.x > 0) {
+		if(this.mouseMovment) {
+			var _this = com_framework_utils_Input.i;
+			if(_this.mousePosition.x * _this.screenScale.x < collision.x - 10) {
 				collision.velocityX = -speed;
+			} else {
+				var _this1 = com_framework_utils_Input.i;
+				if(_this1.mousePosition.x * _this1.screenScale.x > collision.x + 10) {
+					collision.velocityX = speed;
+				}
 			}
 		}
-		if(com_framework_utils_Input.i.isKeyCodeDown(39)) {
-			if(collision.x < 500 - collision.width) {
-				collision.velocityX = speed;
+		if(!this.mouseMovment) {
+			if(com_framework_utils_Input.i.isKeyCodeDown(37)) {
+				if(collision.x > 0) {
+					collision.velocityX = -speed;
+				}
+			}
+			if(com_framework_utils_Input.i.isKeyCodeDown(39)) {
+				if(collision.x < 500 - collision.width) {
+					collision.velocityX = speed;
+				}
 			}
 		}
 	}
@@ -21339,6 +21357,7 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		this.background = new levelObjects_LoopBackground("Antathaan",this.simulationLayer,this.stage.cameras[0]);
 		this.stage.addChild(this.simulationLayer);
 		this.simulationLayer.addChild(this.soundIcon);
+		this.simulationLayer.addChild(this.selectedBg);
 		this.title = new com_gEngine_display_Sprite("title");
 		this.title.scaleX = 0.48;
 		this.title.scaleY = 0.48;
@@ -21390,7 +21409,6 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		this.hudLayer.addChild(this.leftLine);
 		this.hudLayer.addChild(this.bottomLine);
 		this.hudLayer.addChild(this.rightLine);
-		this.hudLayer.addChild(this.selectedBg);
 	}
 	,changeScreen: null
 	,isDrawn: null
