@@ -6035,6 +6035,9 @@ var gameObjects_Ball = function(stage,x,y,spdX,spdY,collisions,maxHp) {
 	if(x + this.collision.width > this.screenWidth) {
 		x = this.screenWidth - this.collision.width - 10;
 	}
+	if(x < 0) {
+		x = 1;
+	}
 	this.collision.x = x;
 	this.collision.y = y;
 	this.hpLayer = new com_gEngine_display_Layer();
@@ -6166,6 +6169,52 @@ gameObjects_Bullet.prototype = $extend(com_framework_utils_Entity.prototype,{
 		GlobalGameData.simulationLayer.addChild(this.display);
 	}
 	,__class__: gameObjects_Bullet
+});
+var gameObjects_FloatingText = function(text,x,y,layer) {
+	this.blue = 0;
+	this.green = 0;
+	this.red = 0;
+	this.currentTime = 0;
+	this.lifeTime = 1;
+	com_framework_utils_Entity.call(this);
+	this.display = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+	this.display.set_text(text);
+	this.display.x = x;
+	this.display.y = y;
+	this.display.scaleX = 0.333333333333333315;
+	this.display.scaleY = 0.333333333333333315;
+	this.red = Math.random();
+	this.green = Math.random();
+	this.blue = Math.random();
+	this.display.setColorMultiply(this.red,this.green,this.blue,1);
+	layer.addChild(this.display);
+};
+$hxClasses["gameObjects.FloatingText"] = gameObjects_FloatingText;
+gameObjects_FloatingText.__name__ = "gameObjects.FloatingText";
+gameObjects_FloatingText.__super__ = com_framework_utils_Entity;
+gameObjects_FloatingText.prototype = $extend(com_framework_utils_Entity.prototype,{
+	display: null
+	,lifeTime: null
+	,currentTime: null
+	,red: null
+	,green: null
+	,blue: null
+	,die: function() {
+		com_framework_utils_Entity.prototype.die.call(this);
+		this.display.removeFromParent();
+	}
+	,update: function(dt) {
+		com_framework_utils_Entity.prototype.update.call(this,dt);
+		this.currentTime += dt;
+		haxe_Log.trace(this.currentTime,{ fileName : "gameObjects/FloatingText.hx", lineNumber : 40, className : "gameObjects.FloatingText", methodName : "update"});
+		if(this.currentTime >= this.lifeTime) {
+			this.die();
+		}
+	}
+	,render: function() {
+		com_framework_utils_Entity.prototype.render.call(this);
+	}
+	,__class__: gameObjects_FloatingText
 });
 var gameObjects_Gun = function() {
 	this.damage = 1;
@@ -6428,6 +6477,7 @@ gameObjects_PowerUp.prototype = $extend(com_framework_utils_Entity.prototype,{
 			this.collision.x = 10;
 			if(this.velocity.x != 0) {
 				this.velocity.x *= -1;
+				this.more = !this.more;
 			}
 		}
 		this.display.x = this.collision.x;
@@ -21012,8 +21062,10 @@ levelObjects_LoopBackground.prototype = $extend(com_framework_utils_Entity.proto
 	}
 	,__class__: levelObjects_LoopBackground
 });
-var states_GameOver = function(score,timeSurvived,sprite) {
+var states_GameOver = function(score,timeSurvived,sprite,level) {
+	this.level = 0;
 	com_framework_utils_State.call(this);
+	this.level = level;
 	this.score = score;
 	this.timeSurvived = timeSurvived;
 	this.sprite = sprite;
@@ -21027,6 +21079,7 @@ states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
 	,timeSurvived: null
 	,display: null
 	,simulationLayer: null
+	,level: null
 	,load: function(resources) {
 		var atlas = new com_loading_basicResources_JoinAtlas(1024,1024);
 		atlas.add(new com_loading_basicResources_ImageLoader("gameOver"));
@@ -21050,15 +21103,23 @@ states_GameOver.prototype = $extend(com_framework_utils_State.prototype,{
 		this.stage.addChild(image);
 		var scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
 		var timeDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
-		scoreDisplay.set_text("Your score is " + this.score);
-		scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - scoreDisplay.width() * 0.5 - 7;
-		scoreDisplay.y = com_gEngine_GEngine.virtualHeight / 2;
-		scoreDisplay.set_color(-65536);
-		timeDisplay.set_text("survived for " + this.timeSurvived);
-		timeDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - timeDisplay.width() * 0.5;
-		timeDisplay.y = com_gEngine_GEngine.virtualHeight / 2 + 50;
-		timeDisplay.set_color(-65536);
+		var levelDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		scoreDisplay.set_text("You scored " + this.score);
+		scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - scoreDisplay.width() * 0.5 * 0.66666666666666663 - 7;
+		scoreDisplay.y = com_gEngine_GEngine.virtualHeight / 2 + 50;
+		scoreDisplay.set_color(-23296);
+		levelDisplay.set_text("Level " + this.level);
+		levelDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - levelDisplay.width() * 0.5 - 7;
+		levelDisplay.y = com_gEngine_GEngine.virtualHeight / 2;
+		levelDisplay.set_color(-23296);
+		timeDisplay.set_text("Survived for " + this.timeSurvived);
+		timeDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - timeDisplay.width() * 0.5 * 0.66666666666666663;
+		timeDisplay.y = com_gEngine_GEngine.virtualHeight / 2 + 80;
+		timeDisplay.set_color(-23296);
+		timeDisplay.scaleX = timeDisplay.scaleY = 0.66666666666666663;
+		scoreDisplay.scaleX = scoreDisplay.scaleY = 0.66666666666666663;
 		this.stage.addChild(scoreDisplay);
+		this.stage.addChild(levelDisplay);
 		this.stage.addChild(timeDisplay);
 	}
 	,playDeadAnimation: function() {
@@ -21085,8 +21146,8 @@ var states_GameState = function(character,level,score,time,playerChar) {
 	this.isDebug = false;
 	this.soundControll = new gameObjects_SoundController();
 	this.ballsAlive = 0;
-	this.time = 0;
 	this.score = 0;
+	this.time = 0;
 	this.allBallsHp = [];
 	com_framework_utils_State.call(this);
 	this.currentLevel = level;
@@ -21102,6 +21163,7 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	character: null
 	,allBallsHp: null
 	,currentLevel: null
+	,time: null
 	,load: function(resources) {
 		var atlas = new com_loading_basicResources_JoinAtlas(1024,1024);
 		atlas.add(new com_loading_basicResources_SparrowLoader(this.character,this.character + "_xml"));
@@ -21123,7 +21185,6 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	,timeDisplay: null
 	,score: null
 	,hudLayer: null
-	,time: null
 	,survivedTime: null
 	,ballsAlive: null
 	,allBalls: null
@@ -21152,15 +21213,23 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 		this.hudLayer = new com_gEngine_display_StaticLayer();
 		this.stage.addChild(this.hudLayer);
 		this.scoreDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
-		this.scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - 105;
+		this.scoreDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - 50;
 		this.scoreDisplay.y = 30;
+		this.scoreDisplay.scaleX = this.scoreDisplay.scaleY = 0.5;
 		this.scoreDisplay.set_text("0");
 		this.hudLayer.addChild(this.scoreDisplay);
 		this.timeDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
-		this.timeDisplay.x = com_gEngine_GEngine.virtualWidth / 2 - 75;
-		this.timeDisplay.y = 80;
+		this.timeDisplay.x = com_gEngine_GEngine.virtualWidth - 90;
+		this.timeDisplay.scaleX = this.timeDisplay.scaleY = 0.5;
+		this.timeDisplay.y = 30;
 		this.hudLayer.addChild(this.timeDisplay);
 		this.allBalls = [];
+		var levelDisplay = new com_gEngine_display_Text(kha_Assets.fonts.PixelOperator8_BoldName);
+		levelDisplay.x = 20;
+		levelDisplay.y = 30;
+		levelDisplay.set_text("Level " + this.currentLevel);
+		levelDisplay.scaleX = levelDisplay.scaleY = 0.5;
+		this.hudLayer.addChild(levelDisplay);
 		this.levelCreator();
 	}
 	,isDebug: null
@@ -21235,14 +21304,16 @@ states_GameState.prototype = $extend(com_framework_utils_State.prototype,{
 	}
 	,playerVsBall: function(aPlayerChar,aBall) {
 		this.playerChar.die();
-		this.changeState(new states_GameOver("" + this.score,this.survivedTime,this.character));
+		this.changeState(new states_GameOver("" + this.score,this.survivedTime,this.character,this.currentLevel));
 	}
 	,powerUpVsPlayer: function(aPowerUp,aPlayerChar) {
 		var powerUp = aPowerUp.userData;
 		if(powerUp.get_powerUpType() > 6) {
 			this.playerChar.add_damage();
+			new gameObjects_FloatingText("Damage up",this.playerChar.get_x(),this.playerChar.get_y() - 75,this.simulationLayer);
 		} else {
 			this.playerChar.add_speed();
+			new gameObjects_FloatingText("Speed up",this.playerChar.get_x(),this.playerChar.get_y() - 75,this.simulationLayer);
 		}
 		powerUp.die();
 	}
@@ -21344,7 +21415,7 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 		this.leftLine.scaleX = this.rightLine.scaleX = 0;
 		this.leftLine.scaleY = this.rightLine.scaleY = 0;
 		this.leftLine.y = this.rightLine.y = this.topLine.y = 488;
-		this.bottomLine.y = 700;
+		this.bottomLine.y = 708;
 	}
 	,init: function() {
 		this.createSelectedBg();
@@ -21422,7 +21493,7 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 			this.startGame();
 		}
 		this.sound();
-		if(com_framework_utils_Input.i.isKeyCodePressed(13) && !this.changeScreen) {
+		if((com_framework_utils_Input.i.isKeyCodePressed(13) || com_framework_utils_Input.i.isMousePressed()) && !this.changeScreen) {
 			this.changeScreen = true;
 			this.pressStart.removeFromParent();
 		}
@@ -21577,11 +21648,11 @@ states_IntroScreen.prototype = $extend(com_framework_utils_State.prototype,{
 	}
 	,backgroundCharacter: function() {
 		this.selectedBg.scaleX = 140;
-		this.selectedBg.scaleY = 210;
+		this.selectedBg.scaleY = 218;
 		this.topLine.scaleX = this.bottomLine.scaleX = 145;
 		this.topLine.scaleY = this.bottomLine.scaleY = 5;
 		this.leftLine.scaleX = this.rightLine.scaleX = 5;
-		this.leftLine.scaleY = this.rightLine.scaleY = 215;
+		this.leftLine.scaleY = this.rightLine.scaleY = 223;
 		if(this.selectedCharacter == "femalePlayer") {
 			this.hans.timeline.playAnimation("walk_");
 			this.selectedBg.x = 290;
@@ -21724,7 +21795,7 @@ states_LoadingScreen.prototype = $extend(com_framework_utils_State.prototype,{
 });
 var states_SuccessScreen = function(score,timeSurvived,sprite,playerStats,currentLevel) {
 	this.more = false;
-	this.time = 0;
+	this.timeSurvived = 0;
 	com_framework_utils_State.call(this);
 	this.nextLevel = currentLevel + 1;
 	this.score = score;
@@ -21742,7 +21813,6 @@ states_SuccessScreen.prototype = $extend(com_framework_utils_State.prototype,{
 	,timeSurvived: null
 	,display: null
 	,simulationLayer: null
-	,time: null
 	,playerStats: null
 	,nextLevel: null
 	,load: function(resources) {
@@ -21801,7 +21871,7 @@ states_SuccessScreen.prototype = $extend(com_framework_utils_State.prototype,{
 	,startNextLevel: function() {
 		var playerChar = new gameObjects_Player(250,650,this.sprite);
 		playerChar.setStats(this.playerStats);
-		this.changeState(new states_GameState(this.sprite,this.nextLevel,this.score,this.time,playerChar));
+		this.changeState(new states_GameState(this.sprite,this.nextLevel,this.score,this.timeSurvived,playerChar));
 	}
 	,__class__: states_SuccessScreen
 });
