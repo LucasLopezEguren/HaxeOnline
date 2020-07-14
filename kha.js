@@ -129,6 +129,20 @@ var Main = function() { };
 $hxClasses["Main"] = Main;
 Main.__name__ = "Main";
 Main.main = function() {
+	window.document.documentElement.style.padding = "0";
+	window.document.documentElement.style.margin = "0";
+	window.document.body.style.padding = "0";
+	window.document.body.style.margin = "0";
+	var canvas = js_Boot.__cast(window.document.getElementById("khanvas") , HTMLCanvasElement);
+	canvas.style.display = "block";
+	var resize = function() {
+		canvas.width = window.innerWidth * window.devicePixelRatio | 0;
+		canvas.height = window.innerHeight * window.devicePixelRatio | 0;
+		canvas.style.width = window.document.documentElement.clientWidth + "px";
+		canvas.style.height = window.document.documentElement.clientHeight + "px";
+	};
+	window.onresize = resize;
+	resize();
 	kha_System.start(new kha_SystemOptions("Defend Antathaan",500,720,new kha_WindowOptions("Defend Antathaan",0,0,500,720,null,true,1,0),new kha_FramebufferOptions()),function(w) {
 		new com_framework_Simulation(states_LoadingBar,500,720);
 	});
@@ -584,6 +598,8 @@ var com_collision_platformer_Body = function() {
 	this.dragX = 1;
 	this.accelerationY = 0;
 	this.accelerationX = 0;
+	this.lastVelocityY = 0;
+	this.lastVelocityX = 0;
 	this.velocityY = 0;
 	this.velocityX = 0;
 	this.y = 0;
@@ -600,6 +616,8 @@ com_collision_platformer_Body.prototype = {
 	,y: null
 	,velocityX: null
 	,velocityY: null
+	,lastVelocityX: null
+	,lastVelocityY: null
 	,accelerationX: null
 	,accelerationY: null
 	,dragX: null
@@ -611,6 +629,8 @@ com_collision_platformer_Body.prototype = {
 		this.touching = 0;
 		this.lastX = this.x;
 		this.lastY = this.y;
+		this.lastVelocityX = this.velocityX;
+		this.lastVelocityY = this.velocityY;
 		this.velocityX += this.accelerationX * dt;
 		this.velocityY += this.accelerationY * dt;
 		if(Math.abs(this.velocityX) > this.maxVelocityX) {
@@ -657,8 +677,8 @@ com_collision_platformer_ICollider.prototype = {
 	,__class__: com_collision_platformer_ICollider
 };
 var com_collision_platformer_CollisionBox = function() {
-	this.height = 0;
-	this.width = 0;
+	this.height = 10;
+	this.width = 10;
 	com_collision_platformer_Body.call(this);
 };
 $hxClasses["com.collision.platformer.CollisionBox"] = com_collision_platformer_CollisionBox;
@@ -710,8 +730,26 @@ com_collision_platformer_CollisionEngine.renderDebug = function(canvas,camera) {
 	canvas.get_g2().begin(false);
 	canvas.get_g2().set_color(-256);
 	var cV = camera.view;
+	var scaleX = canvas.get_width() / camera.width;
+	var scaleY = canvas.get_height() / camera.height;
 	var _this = canvas.get_g2();
-	var transformation = new kha_math_FastMatrix3(cV._00,cV._10,cV._30 + camera.width * 0.5,cV._01,cV._11,cV._31 + camera.height * 0.5,cV._03,cV._13,cV._33);
+	var _this__10 = 0;
+	var _this__20 = 0;
+	var _this__01 = 0;
+	var _this__21 = 0;
+	var _this__02 = 0;
+	var _this__12 = 0;
+	var _this__22 = 1;
+	var _00 = cV._00;
+	var _10 = cV._10;
+	var _20 = cV._30 + camera.width * 0.5;
+	var _01 = cV._01;
+	var _11 = cV._11;
+	var _21 = cV._31 + camera.height * 0.5;
+	var _02 = cV._03;
+	var _12 = cV._13;
+	var _22 = cV._33;
+	var transformation = new kha_math_FastMatrix3(scaleX * _00 + _this__10 * _01 + _this__20 * _02,scaleX * _10 + _this__10 * _11 + _this__20 * _12,scaleX * _20 + _this__10 * _21 + _this__20 * _22,_this__01 * _00 + scaleY * _01 + _this__21 * _02,_this__01 * _10 + scaleY * _11 + _this__21 * _12,_this__01 * _20 + scaleY * _21 + _this__21 * _22,_this__02 * _00 + _this__12 * _01 + _this__22 * _02,_this__02 * _10 + _this__12 * _11 + _this__22 * _12,_this__02 * _20 + _this__12 * _21 + _this__22 * _22);
 	_this.setTransformation(transformation);
 	var _this1 = _this.transformations[_this.transformationIndex];
 	_this1._00 = transformation._00;
@@ -745,10 +783,14 @@ com_collision_platformer_CollisionGroup.prototype = {
 	,userData: null
 	,parent: null
 	,add: function(aCollider) {
+		if(aCollider.parent == this) {
+			return;
+		}
 		this.colliders.push(aCollider);
 		aCollider.parent = this;
 	}
 	,remove: function(aCollider) {
+		aCollider.parent = null;
 		HxOverrides.remove(this.colliders,aCollider);
 	}
 	,overlap: function(aCollider,NotifyCallback) {
@@ -1008,7 +1050,13 @@ com_framework_utils_Entity.prototype = {
 	,render: function() {
 		var _g = 0;
 		var _g1 = this.children;
-		while(_g < _g1.length) _g1[_g++].render();
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(!child.limbo) {
+				child.render();
+			}
+		}
 	}
 	,destroy: function() {
 		var _g = 0;
@@ -1052,6 +1100,8 @@ com_framework_utils_Entity.prototype = {
 	,__class__: com_framework_utils_Entity
 };
 var com_framework_utils_Input = function() {
+	this.mouseDeltaY = 0;
+	this.mouseDeltaX = 0;
 	this.screenScale = new com_helpers_FastPoint(1,1);
 	this.mouseIsDown = false;
 	this.mousePressed = false;
@@ -1092,6 +1142,8 @@ com_framework_utils_Input.prototype = {
 	,keysReleased: null
 	,touchPos: null
 	,touchActive: null
+	,mouseDeltaX: null
+	,mouseDeltaY: null
 	,activeTouchSpots: null
 	,joysticks: null
 	,mousePosition: null
@@ -1110,7 +1162,7 @@ com_framework_utils_Input.prototype = {
 		kha_input_Gamepad.notifyOnConnect($bind(this,this.onConnect),$bind(this,this.onDisconnect));
 	}
 	,onConnect: function(aId) {
-		haxe_Log.trace("gamepad " + aId,{ fileName : "com/framework/utils/Input.hx", lineNumber : 83, className : "com.framework.utils.Input", methodName : "onConnect"});
+		haxe_Log.trace("gamepad " + aId,{ fileName : "com/framework/utils/Input.hx", lineNumber : 86, className : "com.framework.utils.Input", methodName : "onConnect"});
 		this.joysticks[aId].onConnect();
 	}
 	,onDisconnect: function(gamePad) {
@@ -1135,6 +1187,8 @@ com_framework_utils_Input.prototype = {
 	}
 	,onTouchEnd: function(id,x,y) {
 		HxOverrides.remove(this.touchActive,id);
+		this.touchPos[id * 2] = x;
+		this.touchPos[id * 2 + 1] = y;
 		--this.activeTouchSpots;
 		if(id == 0) {
 			var _this = this.mousePosition;
@@ -1149,6 +1203,7 @@ com_framework_utils_Input.prototype = {
 			_this.x = x1;
 			_this.y = y1;
 			this.mouseIsDown = false;
+			this.mouseReleased = true;
 		}
 	}
 	,onTouchStart: function(id,x,y) {
@@ -1169,19 +1224,30 @@ com_framework_utils_Input.prototype = {
 			_this.x = x1;
 			_this.y = y1;
 			this.mouseIsDown = true;
+			this.mousePressed = true;
 		}
 	}
-	,onMouseMove: function(x,y,speedX,speedY) {
+	,onMouseMove: function(x,y,moveX,moveY) {
+		this.touchPos[0] = x;
+		this.touchPos[1] = y;
 		this.mousePosition.x = x;
 		this.mousePosition.y = y;
+		this.mouseDeltaX = moveX;
+		this.mouseDeltaY = moveY;
 	}
 	,onMouseUp: function(button,x,y) {
+		HxOverrides.remove(this.touchActive,0);
+		--this.activeTouchSpots;
 		this.mousePosition.x = x;
 		this.mousePosition.y = y;
 		this.mouseReleased = button == 0;
 		this.mouseIsDown = button != 0;
 	}
 	,onMouseDown: function(button,x,y) {
+		++this.activeTouchSpots;
+		this.touchActive.push(0);
+		this.touchPos[0] = x;
+		this.touchPos[1] = y;
 		this.mousePosition.x = x;
 		this.mousePosition.y = y;
 		this.mousePressed = this.mouseIsDown = button == 0;
@@ -1207,6 +1273,8 @@ com_framework_utils_Input.prototype = {
 		var _g = 0;
 		var _g1 = this.joysticks;
 		while(_g < _g1.length) _g1[_g++].update();
+		this.mouseDeltaX = 0;
+		this.mouseDeltaY = 0;
 	}
 	,clearInput: function() {
 		this.mousePressed = false;
@@ -1507,30 +1575,14 @@ com_gEngine_DrawArea.prototype = {
 	}
 	,__class__: com_gEngine_DrawArea
 };
-var com_gEngine_Filter = function(filters,r,g,b,a,cropScreen) {
+var com_gEngine_Filter = function(filters,cropScreen) {
 	if(cropScreen == null) {
 		cropScreen = true;
-	}
-	if(a == null) {
-		a = 0;
-	}
-	if(b == null) {
-		b = 0;
-	}
-	if(g == null) {
-		g = 0;
-	}
-	if(r == null) {
-		r = 0;
 	}
 	this.alpha = 0;
 	this.blue = 0;
 	this.green = 0;
 	this.red = 0;
-	this.red = r;
-	this.green = g;
-	this.blue = b;
-	this.alpha = a;
 	this.cropScreen = cropScreen;
 	this.renderPass = [];
 	this.drawArea = new com_helpers_MinMax();
@@ -1762,7 +1814,7 @@ var com_gEngine_GEngine = function(oversample,antiAlias) {
 	this.currentCanvasActive = false;
 	this.scaleHeigth = 1;
 	this.scaleWidth = 1;
-	this.antiAliasing = 4;
+	this.antiAliasing = 0;
 	this.identity3x3 = new kha_math_FastMatrix3(1,0,0,0,1,0,0,0,1);
 	this.fps = 0;
 	this.previousTime = 0.0;
@@ -1796,7 +1848,7 @@ com_gEngine_GEngine.init = function(virtualWidth,virtualHeight,oversample,antiAl
 	com_gEngine_GEngine.virtualWidth = virtualWidth;
 	com_gEngine_GEngine.virtualHeight = virtualHeight;
 	com_gEngine_GEngine.i = new com_gEngine_GEngine(oversample,antiAlias);
-	kha_Assets.loadFont("mainfont",com_gEngine_GEngine.setFont,null,{ fileName : "com/gEngine/GEngine.hx", lineNumber : 153, className : "com.gEngine.GEngine", methodName : "init"});
+	kha_Assets.loadFont("mainfont",com_gEngine_GEngine.setFont,null,{ fileName : "com/gEngine/GEngine.hx", lineNumber : 156, className : "com.gEngine.GEngine", methodName : "init"});
 };
 com_gEngine_GEngine.setFont = function(aFont) {
 	com_gEngine_GEngine.get_i().font = aFont;
@@ -1859,6 +1911,54 @@ com_gEngine_GEngine.prototype = {
 		var right = com_gEngine_GEngine.virtualWidth / this.scaleWidth / renderScale;
 		var bottom = com_gEngine_GEngine.virtualHeight / this.scaleHeigth / renderScale;
 		this.modelViewMatrix = new kha_math_FastMatrix4(2 / right,0,0,-right / right,0,2.0 / (0 - bottom),0,-bottom / (0 - bottom),0,0,-0.0004,-1.,0,0,0,1);
+		if(kha_Image.renderTargetsInvertedY()) {
+			var _this = this.modelViewMatrix;
+			var _this__00 = 1;
+			var _this__10 = 0;
+			var _this__20 = 0;
+			var _this__30 = 0;
+			var _this__01 = 0;
+			var _this__11 = -1;
+			var _this__21 = 0;
+			var _this__31 = 0;
+			var _this__02 = 0;
+			var _this__12 = 0;
+			var _this__22 = 1;
+			var _this__32 = 0;
+			var _this__03 = 0;
+			var _this__13 = 0;
+			var _this__23 = 0;
+			var _this__33 = 1;
+			var m = this.modelViewMatrix;
+			var _01 = _this__01 * m._00 + _this__11 * m._01 + _this__21 * m._02 + _this__31 * m._03;
+			var _11 = _this__01 * m._10 + _this__11 * m._11 + _this__21 * m._12 + _this__31 * m._13;
+			var _21 = _this__01 * m._20 + _this__11 * m._21 + _this__21 * m._22 + _this__31 * m._23;
+			var _31 = _this__01 * m._30 + _this__11 * m._31 + _this__21 * m._32 + _this__31 * m._33;
+			var _02 = _this__02 * m._00 + _this__12 * m._01 + _this__22 * m._02 + _this__32 * m._03;
+			var _12 = _this__02 * m._10 + _this__12 * m._11 + _this__22 * m._12 + _this__32 * m._13;
+			var _22 = _this__02 * m._20 + _this__12 * m._21 + _this__22 * m._22 + _this__32 * m._23;
+			var _32 = _this__02 * m._30 + _this__12 * m._31 + _this__22 * m._32 + _this__32 * m._33;
+			var _03 = _this__03 * m._00 + _this__13 * m._01 + _this__23 * m._02 + _this__33 * m._03;
+			var _13 = _this__03 * m._10 + _this__13 * m._11 + _this__23 * m._12 + _this__33 * m._13;
+			var _23 = _this__03 * m._20 + _this__13 * m._21 + _this__23 * m._22 + _this__33 * m._23;
+			var _33 = _this__03 * m._30 + _this__13 * m._31 + _this__23 * m._32 + _this__33 * m._33;
+			_this._00 = _this__00 * m._00 + _this__10 * m._01 + _this__20 * m._02 + _this__30 * m._03;
+			_this._10 = _this__00 * m._10 + _this__10 * m._11 + _this__20 * m._12 + _this__30 * m._13;
+			_this._20 = _this__00 * m._20 + _this__10 * m._21 + _this__20 * m._22 + _this__30 * m._23;
+			_this._30 = _this__00 * m._30 + _this__10 * m._31 + _this__20 * m._32 + _this__30 * m._33;
+			_this._01 = _01;
+			_this._11 = _11;
+			_this._21 = _21;
+			_this._31 = _31;
+			_this._02 = _02;
+			_this._12 = _12;
+			_this._22 = _22;
+			_this._32 = _32;
+			_this._03 = _03;
+			_this._13 = _13;
+			_this._23 = _23;
+			_this._33 = _33;
+		}
 		return true;
 	}
 	,createDefaultPainters: function() {
@@ -2258,10 +2358,17 @@ com_gEngine_display_Blend.prototype = {
 	,alphaBlendDestination: null
 	,__class__: com_gEngine_display_Blend
 };
-var com_gEngine_display_Camera = function() {
+var com_gEngine_display_Camera = function(width,height) {
+	if(height == null) {
+		height = -1;
+	}
+	if(width == null) {
+		width = -1;
+	}
 	this.projectionIsOrthogonal = false;
 	this.camera2d = true;
 	this.blend = 0;
+	this.textureFilter = 1;
 	this.shakeY = 0;
 	this.shakeX = 0;
 	this.pixelSnap = false;
@@ -2277,22 +2384,22 @@ var com_gEngine_display_Camera = function() {
 	this.shakeInterval = 0;
 	this.time = 0;
 	this.scale = 1;
-	this.width = com_gEngine_GEngine.virtualWidth;
-	this.height = com_gEngine_GEngine.virtualHeight;
+	if(width < 0 || height < 0) {
+		width = com_gEngine_GEngine.virtualWidth;
+		height = com_gEngine_GEngine.virtualHeight;
+	}
 	this.eye = new kha_math_FastVector3(0,0,646.1168);
 	this.at = new kha_math_FastVector3(0,0,0);
 	this.up = new kha_math_FastVector3(0,1,0);
 	this.view = new kha_math_FastMatrix4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
 	this.updateView();
-	this.targetPos = new com_helpers_FastPoint(this.width * 0.5,this.height * 0.5);
-	var width = this.width;
-	var height = this.height;
+	this.targetPos = new com_helpers_FastPoint(width * 0.5,height * 0.5);
 	this.drawArea = com_helpers_MinMax.from(0,0,width,height);
 	this.finalX = 0;
 	this.finalY = 0;
 	this.width = width;
 	this.height = height;
-	this.renderTarget = com_gEngine_GEngine.get_i().getRenderTarget(this.width,this.height);
+	this.renderTarget = com_gEngine_GEngine.get_i().getRenderTarget(width,height);
 	this.setOrthogonalProjection();
 	this.projection = this.orthogonal;
 	this.projectionIsOrthogonal = true;
@@ -2335,6 +2442,7 @@ com_gEngine_display_Camera.prototype = {
 	,shakeY: null
 	,perlin: null
 	,drawArea: null
+	,textureFilter: null
 	,blend: null
 	,world: null
 	,camera2d: null
@@ -2512,46 +2620,11 @@ com_gEngine_display_Camera.prototype = {
 		this.orthogonal = this.createOrthogonalProjection();
 	}
 	,createOrthogonalProjection: function() {
-		if(kha_Image.renderTargetsInvertedY()) {
-			var _this__00 = 1;
-			var _this__10 = 0;
-			var _this__20 = 0;
-			var _this__30 = 0;
-			var _this__01 = 0;
-			var _this__11 = -1;
-			var _this__21 = 0;
-			var _this__31 = 0;
-			var _this__02 = 0;
-			var _this__12 = 0;
-			var _this__22 = 1;
-			var _this__32 = 0;
-			var _this__03 = 0;
-			var _this__13 = 0;
-			var _this__23 = 0;
-			var _this__33 = 1;
-			var left = -this.width * 0.5;
-			var right = this.width * 0.5;
-			var bottom = this.height * 0.5;
-			var top = -this.height * 0.5;
-			var tx = -(right + left) / (right - left);
-			var ty = -(top + bottom) / (top - bottom);
-			var m__00 = 2 / (right - left);
-			var m__10 = 0;
-			var m__01 = 0;
-			var m__11 = 2.0 / (top - bottom);
-			var m__02 = 0;
-			var m__12 = 0;
-			var m__03 = 0;
-			var m__13 = 0;
-			var m__33 = 1;
-			return new kha_math_FastMatrix4(_this__00 * m__00 + _this__10 * m__01 + _this__20 * m__02 + _this__30 * m__03,_this__00 * m__10 + _this__10 * m__11 + _this__20 * m__12 + _this__30 * m__13,0.,_this__00 * tx + _this__10 * ty + _this__30 * m__33,_this__01 * m__00 + _this__11 * m__01 + _this__21 * m__02 + _this__31 * m__03,_this__01 * m__10 + _this__11 * m__11 + _this__21 * m__12 + _this__31 * m__13,0.,_this__01 * tx + _this__11 * ty + _this__31 * m__33,_this__02 * m__00 + _this__12 * m__01 + _this__22 * m__02 + _this__32 * m__03,_this__02 * m__10 + _this__12 * m__11 + _this__22 * m__12 + _this__32 * m__13,-0.0002,_this__02 * tx + _this__12 * ty + _this__32 * m__33,_this__03 * m__00 + _this__13 * m__01 + _this__23 * m__02 + _this__33 * m__03,_this__03 * m__10 + _this__13 * m__11 + _this__23 * m__12 + _this__33 * m__13,0.,_this__03 * tx + _this__13 * ty + _this__33 * m__33);
-		} else {
-			var left1 = -this.width * 0.5;
-			var right1 = this.width * 0.5;
-			var bottom1 = this.height * 0.5;
-			var top1 = -this.height * 0.5;
-			return new kha_math_FastMatrix4(2 / (right1 - left1),0,0,-(right1 + left1) / (right1 - left1),0,2.0 / (top1 - bottom1),0,-(top1 + bottom1) / (top1 - bottom1),0,0,-0.0002,0.,0,0,0,1);
-		}
+		var left = -this.width * 0.5;
+		var right = this.width * 0.5;
+		var bottom = this.height * 0.5;
+		var top = -this.height * 0.5;
+		return new kha_math_FastMatrix4(2 / (right - left),0,0,-(right + left) / (right - left),0,2.0 / (top - bottom),0,-(top + bottom) / (top - bottom),0,0,-0.0002,0.,0,0,0,1);
 	}
 	,createScreenTransform: function() {
 		if(kha_Image.renderTargetsInvertedY()) {
@@ -2605,15 +2678,10 @@ com_gEngine_display_Camera.prototype = {
 		com_gEngine_GEngine.get_i().changeToBuffer();
 		com_gEngine_GEngine.get_i().beginCanvas();
 		var painter = this.postProcess != null ? this.postProcess : com_gEngine_GEngine.get_i().getSimplePainter(this.blend);
+		painter.filter = this.textureFilter;
 		painter.setProjection(com_gEngine_GEngine.get_i().getMatrix());
 		com_gEngine_GEngine.get_i().renderBufferFull(this.renderTarget,painter,this.finalX,this.finalY,this.width,this.height,1,false,1);
 		com_gEngine_GEngine.get_i().endCanvas();
-	}
-	,screenToWorldX: function(x) {
-		return (x + this.width * 0.5) / this.scale - this.x + this.width * 0.5;
-	}
-	,screenToWorldY: function(y) {
-		return (y + this.height * 0.5) / this.scale - this.y + this.height * 0.5;
 	}
 	,destroy: function() {
 		com_gEngine_GEngine.get_i().releaseRenderTarget(this.renderTarget);
@@ -3128,10 +3196,10 @@ com_gEngine_display_Layer.prototype = {
 		var oldMulG = paintMode.mulG;
 		var oldMulB = paintMode.mulB;
 		var oldMulA = paintMode.mulA;
-		paintMode.mulR = this.mulR;
-		paintMode.mulG = this.mulG;
-		paintMode.mulB = this.mulB;
-		paintMode.mulA = this.mulA;
+		paintMode.mulR *= this.mulR;
+		paintMode.mulG *= this.mulG;
+		paintMode.mulB *= this.mulB;
+		paintMode.mulA *= this.mulA;
 		paintMode.colorTransform = true;
 		if(this.drawArea != null) {
 			paintMode.render();
@@ -3608,11 +3676,15 @@ com_gEngine_display_Layer.prototype = {
 		}
 	}
 	,addChild: function(child) {
+		if(child.parent == this) {
+			return;
+		}
 		child.parent = this;
 		this.children.push(child);
 	}
 	,remove: function(child) {
 		var counter = 0;
+		child.parent = null;
 		var _g = 0;
 		var _g1 = this.children;
 		while(_g < _g1.length) {
@@ -3655,11 +3727,13 @@ var com_gEngine_display_Sprite = function(name) {
 	this.colorTransform = false;
 	this.alpha = 1;
 	this.visible = true;
+	this.offsetZ = 0;
 	this.offsetY = 0;
 	this.offsetX = 0;
 	this.pivotY = 0;
 	this.pivotX = 0;
 	this.blend = 0;
+	this.scaleZ = 1;
 	this.scaleY = 1;
 	this.scaleX = 1;
 	this.z = 0;
@@ -3693,6 +3767,7 @@ com_gEngine_display_Sprite.prototype = {
 	,z: null
 	,scaleX: null
 	,scaleY: null
+	,scaleZ: null
 	,rotation: null
 	,blend: null
 	,cosAng: null
@@ -3701,6 +3776,7 @@ com_gEngine_display_Sprite.prototype = {
 	,pivotY: null
 	,offsetX: null
 	,offsetY: null
+	,offsetZ: null
 	,animationData: null
 	,parent: null
 	,visible: null
@@ -3717,6 +3793,9 @@ com_gEngine_display_Sprite.prototype = {
 	,textureFilter: null
 	,mipMapFilter: null
 	,transform: null
+	,rotation3d: null
+	,billboard: null
+	,customPainter: null
 	,filter: null
 	,timeline: null
 	,paintInfo: null
@@ -3738,26 +3817,236 @@ com_gEngine_display_Sprite.prototype = {
 		if(this.filter != null) {
 			this.filter.filterStart(this,paintMode,transform);
 		}
+		var _this = this.transform;
+		_this._00 = 1;
+		_this._10 = 0;
+		_this._20 = 0;
+		_this._30 = 0;
+		_this._01 = 0;
+		_this._11 = 1;
+		_this._21 = 0;
+		_this._31 = 0;
+		_this._02 = 0;
+		_this._12 = 0;
+		_this._22 = 1;
+		_this._32 = 0;
+		_this._03 = 0;
+		_this._13 = 0;
+		_this._23 = 0;
+		_this._33 = 1;
 		this.transform._00 = this.cosAng * this.scaleX;
 		this.transform._10 = -this.sinAng * this.scaleY;
 		this.transform._30 = this.x + this.pivotX;
 		this.transform._01 = this.sinAng * this.scaleX;
 		this.transform._11 = this.cosAng * this.scaleY;
 		this.transform._31 = this.y + this.pivotY;
+		this.transform._22 = this.scaleZ;
 		this.transform._32 = this.z;
-		var m = this.transform;
-		var _00 = transform._00 * m._00 + transform._10 * m._01 + transform._20 * m._02 + transform._30 * m._03;
-		var _10 = transform._00 * m._10 + transform._10 * m._11 + transform._20 * m._12 + transform._30 * m._13;
-		var _20 = transform._00 * m._20 + transform._10 * m._21 + transform._20 * m._22 + transform._30 * m._23;
-		var _30 = transform._00 * m._30 + transform._10 * m._31 + transform._20 * m._32 + transform._30 * m._33;
-		var _01 = transform._01 * m._00 + transform._11 * m._01 + transform._21 * m._02 + transform._31 * m._03;
-		var _11 = transform._01 * m._10 + transform._11 * m._11 + transform._21 * m._12 + transform._31 * m._13;
-		var _21 = transform._01 * m._20 + transform._11 * m._21 + transform._21 * m._22 + transform._31 * m._23;
-		var _31 = transform._01 * m._30 + transform._11 * m._31 + transform._21 * m._32 + transform._31 * m._33;
-		var _02 = transform._02 * m._00 + transform._12 * m._01 + transform._22 * m._02 + transform._32 * m._03;
-		var _12 = transform._02 * m._10 + transform._12 * m._11 + transform._22 * m._12 + transform._32 * m._13;
-		var _22 = transform._02 * m._20 + transform._12 * m._21 + transform._22 * m._22 + transform._32 * m._23;
-		var _32 = transform._02 * m._30 + transform._12 * m._31 + transform._22 * m._32 + transform._32 * m._33;
+		if(this.billboard) {
+			var m3 = transform._12;
+			var m4 = transform._22;
+			var m5 = transform._32;
+			var m6 = transform._13;
+			var m7 = transform._23;
+			var m8 = transform._33;
+			var c00 = transform._11 * (m4 * m8 - m5 * m7) - transform._21 * (m3 * m8 - m5 * m6) + transform._31 * (m3 * m7 - m4 * m6);
+			var m31 = transform._12;
+			var m41 = transform._22;
+			var m51 = transform._32;
+			var m61 = transform._13;
+			var m71 = transform._23;
+			var m81 = transform._33;
+			var c01 = transform._10 * (m41 * m81 - m51 * m71) - transform._20 * (m31 * m81 - m51 * m61) + transform._30 * (m31 * m71 - m41 * m61);
+			var m32 = transform._11;
+			var m42 = transform._21;
+			var m52 = transform._31;
+			var m62 = transform._13;
+			var m72 = transform._23;
+			var m82 = transform._33;
+			var c02 = transform._10 * (m42 * m82 - m52 * m72) - transform._20 * (m32 * m82 - m52 * m62) + transform._30 * (m32 * m72 - m42 * m62);
+			var m33 = transform._11;
+			var m43 = transform._21;
+			var m53 = transform._31;
+			var m63 = transform._12;
+			var m73 = transform._22;
+			var m83 = transform._32;
+			var c03 = transform._10 * (m43 * m83 - m53 * m73) - transform._20 * (m33 * m83 - m53 * m63) + transform._30 * (m33 * m73 - m43 * m63);
+			var det = transform._00 * c00 - transform._01 * c01 + transform._02 * c02 - transform._03 * c03;
+			if(Math.abs(det) < 0.000001) {
+				throw new js__$Boot_HaxeError("determinant is too small");
+			}
+			var m34 = transform._02;
+			var m44 = transform._22;
+			var m54 = transform._32;
+			var m64 = transform._03;
+			var m74 = transform._23;
+			var m84 = transform._33;
+			var m35 = transform._02;
+			var m45 = transform._22;
+			var m55 = transform._32;
+			var m65 = transform._03;
+			var m75 = transform._23;
+			var m85 = transform._33;
+			var m36 = transform._01;
+			var m46 = transform._21;
+			var m56 = transform._31;
+			var m66 = transform._03;
+			var m76 = transform._23;
+			var m86 = transform._33;
+			var m37 = transform._01;
+			var m47 = transform._21;
+			var m57 = transform._31;
+			var m67 = transform._02;
+			var m77 = transform._22;
+			var m87 = transform._32;
+			var m38 = transform._02;
+			var m48 = transform._12;
+			var m58 = transform._32;
+			var m68 = transform._03;
+			var m78 = transform._13;
+			var m88 = transform._33;
+			var m39 = transform._02;
+			var m49 = transform._12;
+			var m59 = transform._32;
+			var m69 = transform._03;
+			var m79 = transform._13;
+			var m89 = transform._33;
+			var m310 = transform._01;
+			var m410 = transform._11;
+			var m510 = transform._31;
+			var m610 = transform._03;
+			var m710 = transform._13;
+			var m810 = transform._33;
+			var m311 = transform._01;
+			var m411 = transform._11;
+			var m511 = transform._31;
+			var m611 = transform._02;
+			var m711 = transform._12;
+			var m811 = transform._32;
+			var m312 = transform._02;
+			var m412 = transform._12;
+			var m512 = transform._22;
+			var m612 = transform._03;
+			var m712 = transform._13;
+			var m812 = transform._23;
+			var m313 = transform._02;
+			var m413 = transform._12;
+			var m513 = transform._22;
+			var m613 = transform._03;
+			var m713 = transform._13;
+			var m813 = transform._23;
+			var m314 = transform._01;
+			var m414 = transform._11;
+			var m514 = transform._21;
+			var m614 = transform._03;
+			var m714 = transform._13;
+			var m814 = transform._23;
+			var m315 = transform._01;
+			var m415 = transform._11;
+			var m515 = transform._21;
+			var m615 = transform._02;
+			var m715 = transform._12;
+			var m815 = transform._22;
+			var invdet = 1.0 / det;
+			var rotation__00 = c00 * invdet;
+			var rotation__10 = -c01 * invdet;
+			var rotation__20 = c02 * invdet;
+			var rotation__30 = -c03 * invdet;
+			var rotation__01 = -(transform._01 * (m44 * m84 - m54 * m74) - transform._21 * (m34 * m84 - m54 * m64) + transform._31 * (m34 * m74 - m44 * m64)) * invdet;
+			var rotation__11 = (transform._00 * (m45 * m85 - m55 * m75) - transform._20 * (m35 * m85 - m55 * m65) + transform._30 * (m35 * m75 - m45 * m65)) * invdet;
+			var rotation__21 = -(transform._00 * (m46 * m86 - m56 * m76) - transform._20 * (m36 * m86 - m56 * m66) + transform._30 * (m36 * m76 - m46 * m66)) * invdet;
+			var rotation__31 = (transform._00 * (m47 * m87 - m57 * m77) - transform._20 * (m37 * m87 - m57 * m67) + transform._30 * (m37 * m77 - m47 * m67)) * invdet;
+			var rotation__02 = (transform._01 * (m48 * m88 - m58 * m78) - transform._11 * (m38 * m88 - m58 * m68) + transform._31 * (m38 * m78 - m48 * m68)) * invdet;
+			var rotation__12 = -(transform._00 * (m49 * m89 - m59 * m79) - transform._10 * (m39 * m89 - m59 * m69) + transform._30 * (m39 * m79 - m49 * m69)) * invdet;
+			var rotation__22 = (transform._00 * (m410 * m810 - m510 * m710) - transform._10 * (m310 * m810 - m510 * m610) + transform._30 * (m310 * m710 - m410 * m610)) * invdet;
+			var rotation__32 = -(transform._00 * (m411 * m811 - m511 * m711) - transform._10 * (m311 * m811 - m511 * m611) + transform._30 * (m311 * m711 - m411 * m611)) * invdet;
+			var rotation__03 = -(transform._01 * (m412 * m812 - m512 * m712) - transform._11 * (m312 * m812 - m512 * m612) + transform._21 * (m312 * m712 - m412 * m612)) * invdet;
+			var rotation__13 = (transform._00 * (m413 * m813 - m513 * m713) - transform._10 * (m313 * m813 - m513 * m613) + transform._20 * (m313 * m713 - m413 * m613)) * invdet;
+			var rotation__23 = -(transform._00 * (m414 * m814 - m514 * m714) - transform._10 * (m314 * m814 - m514 * m614) + transform._20 * (m314 * m714 - m414 * m614)) * invdet;
+			var rotation__33 = (transform._00 * (m415 * m815 - m515 * m715) - transform._10 * (m315 * m815 - m515 * m615) + transform._20 * (m315 * m715 - m415 * m615)) * invdet;
+			rotation__32 = 0;
+			rotation__31 = rotation__32;
+			rotation__30 = rotation__31;
+			var _this1 = this.transform;
+			var _this2 = this.transform;
+			var _10 = _this2._00 * rotation__10 + _this2._10 * rotation__11 + _this2._20 * rotation__12 + _this2._30 * rotation__13;
+			var _20 = _this2._00 * rotation__20 + _this2._10 * rotation__21 + _this2._20 * rotation__22 + _this2._30 * rotation__23;
+			var _30 = _this2._00 * rotation__30 + _this2._10 * rotation__31 + _this2._20 * rotation__32 + _this2._30 * rotation__33;
+			var _11 = _this2._01 * rotation__10 + _this2._11 * rotation__11 + _this2._21 * rotation__12 + _this2._31 * rotation__13;
+			var _21 = _this2._01 * rotation__20 + _this2._11 * rotation__21 + _this2._21 * rotation__22 + _this2._31 * rotation__23;
+			var _31 = _this2._01 * rotation__30 + _this2._11 * rotation__31 + _this2._21 * rotation__32 + _this2._31 * rotation__33;
+			var _12 = _this2._02 * rotation__10 + _this2._12 * rotation__11 + _this2._22 * rotation__12 + _this2._32 * rotation__13;
+			var _22 = _this2._02 * rotation__20 + _this2._12 * rotation__21 + _this2._22 * rotation__22 + _this2._32 * rotation__23;
+			var _32 = _this2._02 * rotation__30 + _this2._12 * rotation__31 + _this2._22 * rotation__32 + _this2._32 * rotation__33;
+			var _13 = _this2._03 * rotation__10 + _this2._13 * rotation__11 + _this2._23 * rotation__12 + _this2._33 * rotation__13;
+			var _23 = _this2._03 * rotation__20 + _this2._13 * rotation__21 + _this2._23 * rotation__22 + _this2._33 * rotation__23;
+			var _33 = _this2._03 * rotation__30 + _this2._13 * rotation__31 + _this2._23 * rotation__32 + _this2._33 * rotation__33;
+			_this1._00 = _this2._00 * rotation__00 + _this2._10 * rotation__01 + _this2._20 * rotation__02 + _this2._30 * rotation__03;
+			_this1._10 = _10;
+			_this1._20 = _20;
+			_this1._30 = _30;
+			_this1._01 = _this2._01 * rotation__00 + _this2._11 * rotation__01 + _this2._21 * rotation__02 + _this2._31 * rotation__03;
+			_this1._11 = _11;
+			_this1._21 = _21;
+			_this1._31 = _31;
+			_this1._02 = _this2._02 * rotation__00 + _this2._12 * rotation__01 + _this2._22 * rotation__02 + _this2._32 * rotation__03;
+			_this1._12 = _12;
+			_this1._22 = _22;
+			_this1._32 = _32;
+			_this1._03 = _this2._03 * rotation__00 + _this2._13 * rotation__01 + _this2._23 * rotation__02 + _this2._33 * rotation__03;
+			_this1._13 = _13;
+			_this1._23 = _23;
+			_this1._33 = _33;
+		}
+		if(this.rotation3d != null) {
+			var _this3 = this.transform;
+			var _this4 = this.transform;
+			var m = this.rotation3d;
+			var _101 = _this4._00 * m._10 + _this4._10 * m._11 + _this4._20 * m._12 + _this4._30 * m._13;
+			var _201 = _this4._00 * m._20 + _this4._10 * m._21 + _this4._20 * m._22 + _this4._30 * m._23;
+			var _301 = _this4._00 * m._30 + _this4._10 * m._31 + _this4._20 * m._32 + _this4._30 * m._33;
+			var _01 = _this4._01 * m._00 + _this4._11 * m._01 + _this4._21 * m._02 + _this4._31 * m._03;
+			var _111 = _this4._01 * m._10 + _this4._11 * m._11 + _this4._21 * m._12 + _this4._31 * m._13;
+			var _211 = _this4._01 * m._20 + _this4._11 * m._21 + _this4._21 * m._22 + _this4._31 * m._23;
+			var _311 = _this4._01 * m._30 + _this4._11 * m._31 + _this4._21 * m._32 + _this4._31 * m._33;
+			var _02 = _this4._02 * m._00 + _this4._12 * m._01 + _this4._22 * m._02 + _this4._32 * m._03;
+			var _121 = _this4._02 * m._10 + _this4._12 * m._11 + _this4._22 * m._12 + _this4._32 * m._13;
+			var _221 = _this4._02 * m._20 + _this4._12 * m._21 + _this4._22 * m._22 + _this4._32 * m._23;
+			var _321 = _this4._02 * m._30 + _this4._12 * m._31 + _this4._22 * m._32 + _this4._32 * m._33;
+			var _03 = _this4._03 * m._00 + _this4._13 * m._01 + _this4._23 * m._02 + _this4._33 * m._03;
+			var _131 = _this4._03 * m._10 + _this4._13 * m._11 + _this4._23 * m._12 + _this4._33 * m._13;
+			var _231 = _this4._03 * m._20 + _this4._13 * m._21 + _this4._23 * m._22 + _this4._33 * m._23;
+			var _331 = _this4._03 * m._30 + _this4._13 * m._31 + _this4._23 * m._32 + _this4._33 * m._33;
+			_this3._00 = _this4._00 * m._00 + _this4._10 * m._01 + _this4._20 * m._02 + _this4._30 * m._03;
+			_this3._10 = _101;
+			_this3._20 = _201;
+			_this3._30 = _301;
+			_this3._01 = _01;
+			_this3._11 = _111;
+			_this3._21 = _211;
+			_this3._31 = _311;
+			_this3._02 = _02;
+			_this3._12 = _121;
+			_this3._22 = _221;
+			_this3._32 = _321;
+			_this3._03 = _03;
+			_this3._13 = _131;
+			_this3._23 = _231;
+			_this3._33 = _331;
+		}
+		var m1 = this.transform;
+		var _00 = transform._00 * m1._00 + transform._10 * m1._01 + transform._20 * m1._02 + transform._30 * m1._03;
+		var _102 = transform._00 * m1._10 + transform._10 * m1._11 + transform._20 * m1._12 + transform._30 * m1._13;
+		var _202 = transform._00 * m1._20 + transform._10 * m1._21 + transform._20 * m1._22 + transform._30 * m1._23;
+		var _302 = transform._00 * m1._30 + transform._10 * m1._31 + transform._20 * m1._32 + transform._30 * m1._33;
+		var _011 = transform._01 * m1._00 + transform._11 * m1._01 + transform._21 * m1._02 + transform._31 * m1._03;
+		var _112 = transform._01 * m1._10 + transform._11 * m1._11 + transform._21 * m1._12 + transform._31 * m1._13;
+		var _212 = transform._01 * m1._20 + transform._11 * m1._21 + transform._21 * m1._22 + transform._31 * m1._23;
+		var _312 = transform._01 * m1._30 + transform._11 * m1._31 + transform._21 * m1._32 + transform._31 * m1._33;
+		var _021 = transform._02 * m1._00 + transform._12 * m1._01 + transform._22 * m1._02 + transform._32 * m1._03;
+		var _122 = transform._02 * m1._10 + transform._12 * m1._11 + transform._22 * m1._12 + transform._32 * m1._13;
+		var _222 = transform._02 * m1._20 + transform._12 * m1._21 + transform._22 * m1._22 + transform._32 * m1._23;
+		var _322 = transform._02 * m1._30 + transform._12 * m1._31 + transform._22 * m1._32 + transform._32 * m1._33;
 		var vertexX;
 		var vertexY;
 		var frame = this.animationData.frames[this.timeline.currentFrame];
@@ -3767,9 +4056,11 @@ com_gEngine_display_Sprite.prototype = {
 		this.paintInfo.mipMapFilter = this.mipMapFilter;
 		this.paintInfo.textureFilter = this.textureFilter;
 		this.paintInfo.texture = this.textureId;
-		if(this.colorTransform || paintMode.colorTransform) {
-			var painter = com_gEngine_GEngine.get_i().getColorTransformPainter(this.blend);
+		var cameraScale = paintMode.camera.scale;
+		if(this.colorTransform || paintMode.colorTransform || this.customPainter != null) {
+			var painter = this.customPainter != null ? this.customPainter : com_gEngine_GEngine.get_i().getColorTransformPainter(this.blend);
 			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter);
+			painter = paintMode.currentPainter;
 			var buffer = painter.getVertexBuffer();
 			var vertexBufferCounter = painter.getVertexDataCounter();
 			var redMul = this.mulRed * paintMode.mulR;
@@ -3780,160 +4071,6 @@ com_gEngine_display_Sprite.prototype = {
 			var greenAdd = this.addGreen;
 			var blueAdd = this.addBlue;
 			var alphaAdd = this.addAlpha;
-			vertexX = vertexs[0] - this.pivotX;
-			vertexY = vertexs[1] - this.pivotY;
-			var x = vertexX;
-			var y = vertexY;
-			if(y == null) {
-				y = 0;
-			}
-			if(x == null) {
-				x = 0;
-			}
-			var value_x = x;
-			var value_y = y;
-			var value_z = 0;
-			var value_w = 1;
-			var pos_x = 0;
-			var pos_y = 0;
-			var pos_z = 0;
-			pos_x = _00 * value_x + _10 * value_y + _20 * value_z + _30 * value_w;
-			pos_y = _01 * value_x + _11 * value_y + _21 * value_z + _31 * value_w;
-			pos_z = _02 * value_x + _12 * value_y + _22 * value_z + _32 * value_w;
-			var u = uvs[0];
-			var v = uvs[1];
-			var offsetPos = vertexBufferCounter;
-			buffer[offsetPos++] = pos_x + this.offsetX;
-			buffer[offsetPos++] = pos_y + this.offsetY;
-			buffer[offsetPos++] = pos_z;
-			buffer[offsetPos++] = u;
-			buffer[offsetPos++] = v;
-			buffer[offsetPos++] = redMul;
-			buffer[offsetPos++] = greenMul;
-			buffer[offsetPos++] = blueMul;
-			buffer[offsetPos++] = alphaMul;
-			buffer[offsetPos++] = redAdd;
-			buffer[offsetPos++] = greenAdd;
-			buffer[offsetPos++] = blueAdd;
-			buffer[offsetPos++] = alphaAdd;
-			vertexBufferCounter += 13;
-			vertexX = vertexs[2] - this.pivotX;
-			vertexY = vertexs[3] - this.pivotY;
-			var x1 = vertexX;
-			var y1 = vertexY;
-			if(y1 == null) {
-				y1 = 0;
-			}
-			if(x1 == null) {
-				x1 = 0;
-			}
-			var value_x1 = x1;
-			var value_y1 = y1;
-			var value_z1 = 0;
-			var value_w1 = 1;
-			var pos_x1 = 0;
-			var pos_y1 = 0;
-			var pos_z1 = 0;
-			pos_x1 = _00 * value_x1 + _10 * value_y1 + _20 * value_z1 + _30 * value_w1;
-			pos_y1 = _01 * value_x1 + _11 * value_y1 + _21 * value_z1 + _31 * value_w1;
-			pos_z1 = _02 * value_x1 + _12 * value_y1 + _22 * value_z1 + _32 * value_w1;
-			var u1 = uvs[2];
-			var v1 = uvs[3];
-			var offsetPos1 = vertexBufferCounter;
-			buffer[offsetPos1++] = pos_x1 + this.offsetX;
-			buffer[offsetPos1++] = pos_y1 + this.offsetY;
-			buffer[offsetPos1++] = pos_z1;
-			buffer[offsetPos1++] = u1;
-			buffer[offsetPos1++] = v1;
-			buffer[offsetPos1++] = redMul;
-			buffer[offsetPos1++] = greenMul;
-			buffer[offsetPos1++] = blueMul;
-			buffer[offsetPos1++] = alphaMul;
-			buffer[offsetPos1++] = redAdd;
-			buffer[offsetPos1++] = greenAdd;
-			buffer[offsetPos1++] = blueAdd;
-			buffer[offsetPos1++] = alphaAdd;
-			vertexBufferCounter += 13;
-			vertexX = vertexs[4] - this.pivotX;
-			vertexY = vertexs[5] - this.pivotY;
-			var x2 = vertexX;
-			var y2 = vertexY;
-			if(y2 == null) {
-				y2 = 0;
-			}
-			if(x2 == null) {
-				x2 = 0;
-			}
-			var value_x2 = x2;
-			var value_y2 = y2;
-			var value_z2 = 0;
-			var value_w2 = 1;
-			var pos_x2 = 0;
-			var pos_y2 = 0;
-			var pos_z2 = 0;
-			pos_x2 = _00 * value_x2 + _10 * value_y2 + _20 * value_z2 + _30 * value_w2;
-			pos_y2 = _01 * value_x2 + _11 * value_y2 + _21 * value_z2 + _31 * value_w2;
-			pos_z2 = _02 * value_x2 + _12 * value_y2 + _22 * value_z2 + _32 * value_w2;
-			var u2 = uvs[4];
-			var v2 = uvs[5];
-			var offsetPos2 = vertexBufferCounter;
-			buffer[offsetPos2++] = pos_x2 + this.offsetX;
-			buffer[offsetPos2++] = pos_y2 + this.offsetY;
-			buffer[offsetPos2++] = pos_z2;
-			buffer[offsetPos2++] = u2;
-			buffer[offsetPos2++] = v2;
-			buffer[offsetPos2++] = redMul;
-			buffer[offsetPos2++] = greenMul;
-			buffer[offsetPos2++] = blueMul;
-			buffer[offsetPos2++] = alphaMul;
-			buffer[offsetPos2++] = redAdd;
-			buffer[offsetPos2++] = greenAdd;
-			buffer[offsetPos2++] = blueAdd;
-			buffer[offsetPos2++] = alphaAdd;
-			vertexBufferCounter += 13;
-			vertexX = vertexs[6] - this.pivotX;
-			vertexY = vertexs[7] - this.pivotY;
-			var x3 = vertexX;
-			var y3 = vertexY;
-			if(y3 == null) {
-				y3 = 0;
-			}
-			if(x3 == null) {
-				x3 = 0;
-			}
-			var value_x3 = x3;
-			var value_y3 = y3;
-			var value_z3 = 0;
-			var value_w3 = 1;
-			var pos_x3 = 0;
-			var pos_y3 = 0;
-			var pos_z3 = 0;
-			pos_x3 = _00 * value_x3 + _10 * value_y3 + _20 * value_z3 + _30 * value_w3;
-			pos_y3 = _01 * value_x3 + _11 * value_y3 + _21 * value_z3 + _31 * value_w3;
-			pos_z3 = _02 * value_x3 + _12 * value_y3 + _22 * value_z3 + _32 * value_w3;
-			var u3 = uvs[6];
-			var v3 = uvs[7];
-			var offsetPos3 = vertexBufferCounter;
-			buffer[offsetPos3++] = pos_x3 + this.offsetX;
-			buffer[offsetPos3++] = pos_y3 + this.offsetY;
-			buffer[offsetPos3++] = pos_z3;
-			buffer[offsetPos3++] = u3;
-			buffer[offsetPos3++] = v3;
-			buffer[offsetPos3++] = redMul;
-			buffer[offsetPos3++] = greenMul;
-			buffer[offsetPos3++] = blueMul;
-			buffer[offsetPos3++] = alphaMul;
-			buffer[offsetPos3++] = redAdd;
-			buffer[offsetPos3++] = greenAdd;
-			buffer[offsetPos3++] = blueAdd;
-			buffer[offsetPos3++] = alphaAdd;
-			vertexBufferCounter += 13;
-			painter.setVertexDataCounter(vertexBufferCounter);
-		} else if(this.alpha != 1) {
-			var painter1 = com_gEngine_GEngine.get_i().getAlphaPainter(this.blend);
-			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter1);
-			var buffer1 = painter1.getVertexBuffer();
-			var vertexBufferCounter1 = painter1.getVertexDataCounter();
 			var vertexIndex = 0;
 			var uvIndex = 0;
 			var _g = 0;
@@ -3941,37 +4078,49 @@ com_gEngine_display_Sprite.prototype = {
 				++_g;
 				vertexX = vertexs[vertexIndex++] - this.pivotX;
 				vertexY = vertexs[vertexIndex++] - this.pivotY;
-				var x4 = vertexX;
-				var y4 = vertexY;
-				if(y4 == null) {
-					y4 = 0;
+				var x = vertexX;
+				var y = vertexY;
+				if(y == null) {
+					y = 0;
 				}
-				if(x4 == null) {
-					x4 = 0;
+				if(x == null) {
+					x = 0;
 				}
-				var value_x4 = x4;
-				var value_y4 = y4;
-				var value_z4 = 0;
-				var value_w4 = 1;
-				var pos_x4 = 0;
-				var pos_y4 = 0;
-				var pos_z4 = 0;
-				pos_x4 = _00 * value_x4 + _10 * value_y4 + _20 * value_z4 + _30 * value_w4;
-				pos_y4 = _01 * value_x4 + _11 * value_y4 + _21 * value_z4 + _31 * value_w4;
-				pos_z4 = _02 * value_x4 + _12 * value_y4 + _22 * value_z4 + _32 * value_w4;
-				buffer1[vertexBufferCounter1++] = pos_x4 + this.offsetX;
-				buffer1[vertexBufferCounter1++] = pos_y4 + this.offsetY;
-				buffer1[vertexBufferCounter1++] = pos_z4;
-				buffer1[vertexBufferCounter1++] = uvs[uvIndex++];
-				buffer1[vertexBufferCounter1++] = uvs[uvIndex++];
-				buffer1[vertexBufferCounter1++] = this.alpha;
+				var value_x = x;
+				var value_y = y;
+				var value_z = 0;
+				var value_w = 1;
+				var pos_x = 0;
+				var pos_y = 0;
+				var pos_z = 0;
+				pos_x = _00 * value_x + _102 * value_y + _202 * value_z + _302 * value_w;
+				pos_y = _011 * value_x + _112 * value_y + _212 * value_z + _312 * value_w;
+				pos_z = _021 * value_x + _122 * value_y + _222 * value_z + _322 * value_w;
+				var u = uvs[uvIndex++];
+				var v = uvs[uvIndex++];
+				var offsetPos = vertexBufferCounter;
+				buffer[offsetPos++] = pos_x + this.offsetX * cameraScale;
+				buffer[offsetPos++] = pos_y + this.offsetY * cameraScale;
+				buffer[offsetPos++] = pos_z + this.offsetZ;
+				buffer[offsetPos++] = u;
+				buffer[offsetPos++] = v;
+				buffer[offsetPos++] = redMul;
+				buffer[offsetPos++] = greenMul;
+				buffer[offsetPos++] = blueMul;
+				buffer[offsetPos++] = alphaMul;
+				buffer[offsetPos++] = redAdd;
+				buffer[offsetPos++] = greenAdd;
+				buffer[offsetPos++] = blueAdd;
+				buffer[offsetPos++] = alphaAdd;
+				vertexBufferCounter += 13;
 			}
-			painter1.setVertexDataCounter(vertexBufferCounter1);
-		} else {
-			var painter2 = com_gEngine_GEngine.get_i().getSimplePainter(this.blend);
-			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter2);
-			var buffer2 = painter2.getVertexBuffer();
-			var vertexBufferCounter2 = painter2.getVertexDataCounter();
+			painter.setVertexDataCounter(vertexBufferCounter);
+		} else if(this.alpha != 1) {
+			var painter1 = com_gEngine_GEngine.get_i().getAlphaPainter(this.blend);
+			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter1);
+			painter1 = paintMode.currentPainter;
+			var buffer1 = painter1.getVertexBuffer();
+			var vertexBufferCounter1 = painter1.getVertexDataCounter();
 			var vertexIndex1 = 0;
 			var uvIndex1 = 0;
 			var _g1 = 0;
@@ -3979,29 +4128,68 @@ com_gEngine_display_Sprite.prototype = {
 				++_g1;
 				vertexX = vertexs[vertexIndex1++] - this.pivotX;
 				vertexY = vertexs[vertexIndex1++] - this.pivotY;
-				var x5 = vertexX;
-				var y5 = vertexY;
-				if(y5 == null) {
-					y5 = 0;
+				var x1 = vertexX;
+				var y1 = vertexY;
+				if(y1 == null) {
+					y1 = 0;
 				}
-				if(x5 == null) {
-					x5 = 0;
+				if(x1 == null) {
+					x1 = 0;
 				}
-				var value_x5 = x5;
-				var value_y5 = y5;
-				var value_z5 = 0;
-				var value_w5 = 1;
-				var pos_x5 = 0;
-				var pos_y5 = 0;
-				var pos_z5 = 0;
-				pos_x5 = _00 * value_x5 + _10 * value_y5 + _20 * value_z5 + _30 * value_w5;
-				pos_y5 = _01 * value_x5 + _11 * value_y5 + _21 * value_z5 + _31 * value_w5;
-				pos_z5 = _02 * value_x5 + _12 * value_y5 + _22 * value_z5 + _32 * value_w5;
-				buffer2[vertexBufferCounter2++] = pos_x5 + this.offsetX;
-				buffer2[vertexBufferCounter2++] = pos_y5 + this.offsetY;
-				buffer2[vertexBufferCounter2++] = pos_z5;
-				buffer2[vertexBufferCounter2++] = uvs[uvIndex1++];
-				buffer2[vertexBufferCounter2++] = uvs[uvIndex1++];
+				var value_x1 = x1;
+				var value_y1 = y1;
+				var value_z1 = 0;
+				var value_w1 = 1;
+				var pos_x1 = 0;
+				var pos_y1 = 0;
+				var pos_z1 = 0;
+				pos_x1 = _00 * value_x1 + _102 * value_y1 + _202 * value_z1 + _302 * value_w1;
+				pos_y1 = _011 * value_x1 + _112 * value_y1 + _212 * value_z1 + _312 * value_w1;
+				pos_z1 = _021 * value_x1 + _122 * value_y1 + _222 * value_z1 + _322 * value_w1;
+				buffer1[vertexBufferCounter1++] = pos_x1 + this.offsetX * cameraScale;
+				buffer1[vertexBufferCounter1++] = pos_y1 + this.offsetY * cameraScale;
+				buffer1[vertexBufferCounter1++] = pos_z1;
+				buffer1[vertexBufferCounter1++] = uvs[uvIndex1++];
+				buffer1[vertexBufferCounter1++] = uvs[uvIndex1++];
+				buffer1[vertexBufferCounter1++] = this.alpha;
+			}
+			painter1.setVertexDataCounter(vertexBufferCounter1);
+		} else {
+			var painter2 = com_gEngine_GEngine.get_i().getSimplePainter(this.blend);
+			com_gEngine_display_Sprite.checkBatch(paintMode,this.paintInfo,frame.vertexs.length / 2 | 0,painter2);
+			painter2 = paintMode.currentPainter;
+			var buffer2 = painter2.getVertexBuffer();
+			var vertexBufferCounter2 = painter2.getVertexDataCounter();
+			var vertexIndex2 = 0;
+			var uvIndex2 = 0;
+			var _g2 = 0;
+			while(_g2 < 4) {
+				++_g2;
+				vertexX = vertexs[vertexIndex2++] - this.pivotX;
+				vertexY = vertexs[vertexIndex2++] - this.pivotY;
+				var x2 = vertexX;
+				var y2 = vertexY;
+				if(y2 == null) {
+					y2 = 0;
+				}
+				if(x2 == null) {
+					x2 = 0;
+				}
+				var value_x2 = x2;
+				var value_y2 = y2;
+				var value_z2 = 0;
+				var value_w2 = 1;
+				var pos_x2 = 0;
+				var pos_y2 = 0;
+				var pos_z2 = 0;
+				pos_x2 = _00 * value_x2 + _102 * value_y2 + _202 * value_z2 + _302 * value_w2;
+				pos_y2 = _011 * value_x2 + _112 * value_y2 + _212 * value_z2 + _312 * value_w2;
+				pos_z2 = _021 * value_x2 + _122 * value_y2 + _222 * value_z2 + _322 * value_w2;
+				buffer2[vertexBufferCounter2++] = pos_x2 + this.offsetX * cameraScale;
+				buffer2[vertexBufferCounter2++] = pos_y2 + this.offsetY * cameraScale;
+				buffer2[vertexBufferCounter2++] = pos_z2;
+				buffer2[vertexBufferCounter2++] = uvs[uvIndex2++];
+				buffer2[vertexBufferCounter2++] = uvs[uvIndex2++];
 			}
 			painter2.setVertexDataCounter(vertexBufferCounter2);
 		}
@@ -4035,26 +4223,236 @@ com_gEngine_display_Sprite.prototype = {
 		this.colorTransform = !(this.mulRed == 1 && this.mulGreen == 1 && this.mulBlue == 1 && this.alpha == 1 && this.addRed == 0 && this.addGreen == 0 && this.addBlue == 0 && this.addAlpha == 0);
 	}
 	,getDrawArea: function(area,transform) {
+		var _this = this.transform;
+		_this._00 = 1;
+		_this._10 = 0;
+		_this._20 = 0;
+		_this._30 = 0;
+		_this._01 = 0;
+		_this._11 = 1;
+		_this._21 = 0;
+		_this._31 = 0;
+		_this._02 = 0;
+		_this._12 = 0;
+		_this._22 = 1;
+		_this._32 = 0;
+		_this._03 = 0;
+		_this._13 = 0;
+		_this._23 = 0;
+		_this._33 = 1;
 		this.transform._00 = this.cosAng * this.scaleX;
 		this.transform._10 = -this.sinAng * this.scaleY;
 		this.transform._30 = this.x + this.pivotX;
 		this.transform._01 = this.sinAng * this.scaleX;
 		this.transform._11 = this.cosAng * this.scaleY;
 		this.transform._31 = this.y + this.pivotY;
+		this.transform._22 = this.scaleZ;
 		this.transform._32 = this.z;
-		var m = this.transform;
-		var _00 = transform._00 * m._00 + transform._10 * m._01 + transform._20 * m._02 + transform._30 * m._03;
-		var _10 = transform._00 * m._10 + transform._10 * m._11 + transform._20 * m._12 + transform._30 * m._13;
-		var _20 = transform._00 * m._20 + transform._10 * m._21 + transform._20 * m._22 + transform._30 * m._23;
-		var _30 = transform._00 * m._30 + transform._10 * m._31 + transform._20 * m._32 + transform._30 * m._33;
-		var _01 = transform._01 * m._00 + transform._11 * m._01 + transform._21 * m._02 + transform._31 * m._03;
-		var _11 = transform._01 * m._10 + transform._11 * m._11 + transform._21 * m._12 + transform._31 * m._13;
-		var _21 = transform._01 * m._20 + transform._11 * m._21 + transform._21 * m._22 + transform._31 * m._23;
-		var _31 = transform._01 * m._30 + transform._11 * m._31 + transform._21 * m._32 + transform._31 * m._33;
-		var _02 = transform._02 * m._00 + transform._12 * m._01 + transform._22 * m._02 + transform._32 * m._03;
-		var _12 = transform._02 * m._10 + transform._12 * m._11 + transform._22 * m._12 + transform._32 * m._13;
-		var _22 = transform._02 * m._20 + transform._12 * m._21 + transform._22 * m._22 + transform._32 * m._23;
-		var _32 = transform._02 * m._30 + transform._12 * m._31 + transform._22 * m._32 + transform._32 * m._33;
+		if(this.billboard) {
+			var m3 = transform._12;
+			var m4 = transform._22;
+			var m5 = transform._32;
+			var m6 = transform._13;
+			var m7 = transform._23;
+			var m8 = transform._33;
+			var c00 = transform._11 * (m4 * m8 - m5 * m7) - transform._21 * (m3 * m8 - m5 * m6) + transform._31 * (m3 * m7 - m4 * m6);
+			var m31 = transform._12;
+			var m41 = transform._22;
+			var m51 = transform._32;
+			var m61 = transform._13;
+			var m71 = transform._23;
+			var m81 = transform._33;
+			var c01 = transform._10 * (m41 * m81 - m51 * m71) - transform._20 * (m31 * m81 - m51 * m61) + transform._30 * (m31 * m71 - m41 * m61);
+			var m32 = transform._11;
+			var m42 = transform._21;
+			var m52 = transform._31;
+			var m62 = transform._13;
+			var m72 = transform._23;
+			var m82 = transform._33;
+			var c02 = transform._10 * (m42 * m82 - m52 * m72) - transform._20 * (m32 * m82 - m52 * m62) + transform._30 * (m32 * m72 - m42 * m62);
+			var m33 = transform._11;
+			var m43 = transform._21;
+			var m53 = transform._31;
+			var m63 = transform._12;
+			var m73 = transform._22;
+			var m83 = transform._32;
+			var c03 = transform._10 * (m43 * m83 - m53 * m73) - transform._20 * (m33 * m83 - m53 * m63) + transform._30 * (m33 * m73 - m43 * m63);
+			var det = transform._00 * c00 - transform._01 * c01 + transform._02 * c02 - transform._03 * c03;
+			if(Math.abs(det) < 0.000001) {
+				throw new js__$Boot_HaxeError("determinant is too small");
+			}
+			var m34 = transform._02;
+			var m44 = transform._22;
+			var m54 = transform._32;
+			var m64 = transform._03;
+			var m74 = transform._23;
+			var m84 = transform._33;
+			var m35 = transform._02;
+			var m45 = transform._22;
+			var m55 = transform._32;
+			var m65 = transform._03;
+			var m75 = transform._23;
+			var m85 = transform._33;
+			var m36 = transform._01;
+			var m46 = transform._21;
+			var m56 = transform._31;
+			var m66 = transform._03;
+			var m76 = transform._23;
+			var m86 = transform._33;
+			var m37 = transform._01;
+			var m47 = transform._21;
+			var m57 = transform._31;
+			var m67 = transform._02;
+			var m77 = transform._22;
+			var m87 = transform._32;
+			var m38 = transform._02;
+			var m48 = transform._12;
+			var m58 = transform._32;
+			var m68 = transform._03;
+			var m78 = transform._13;
+			var m88 = transform._33;
+			var m39 = transform._02;
+			var m49 = transform._12;
+			var m59 = transform._32;
+			var m69 = transform._03;
+			var m79 = transform._13;
+			var m89 = transform._33;
+			var m310 = transform._01;
+			var m410 = transform._11;
+			var m510 = transform._31;
+			var m610 = transform._03;
+			var m710 = transform._13;
+			var m810 = transform._33;
+			var m311 = transform._01;
+			var m411 = transform._11;
+			var m511 = transform._31;
+			var m611 = transform._02;
+			var m711 = transform._12;
+			var m811 = transform._32;
+			var m312 = transform._02;
+			var m412 = transform._12;
+			var m512 = transform._22;
+			var m612 = transform._03;
+			var m712 = transform._13;
+			var m812 = transform._23;
+			var m313 = transform._02;
+			var m413 = transform._12;
+			var m513 = transform._22;
+			var m613 = transform._03;
+			var m713 = transform._13;
+			var m813 = transform._23;
+			var m314 = transform._01;
+			var m414 = transform._11;
+			var m514 = transform._21;
+			var m614 = transform._03;
+			var m714 = transform._13;
+			var m814 = transform._23;
+			var m315 = transform._01;
+			var m415 = transform._11;
+			var m515 = transform._21;
+			var m615 = transform._02;
+			var m715 = transform._12;
+			var m815 = transform._22;
+			var invdet = 1.0 / det;
+			var rotation__00 = c00 * invdet;
+			var rotation__10 = -c01 * invdet;
+			var rotation__20 = c02 * invdet;
+			var rotation__30 = -c03 * invdet;
+			var rotation__01 = -(transform._01 * (m44 * m84 - m54 * m74) - transform._21 * (m34 * m84 - m54 * m64) + transform._31 * (m34 * m74 - m44 * m64)) * invdet;
+			var rotation__11 = (transform._00 * (m45 * m85 - m55 * m75) - transform._20 * (m35 * m85 - m55 * m65) + transform._30 * (m35 * m75 - m45 * m65)) * invdet;
+			var rotation__21 = -(transform._00 * (m46 * m86 - m56 * m76) - transform._20 * (m36 * m86 - m56 * m66) + transform._30 * (m36 * m76 - m46 * m66)) * invdet;
+			var rotation__31 = (transform._00 * (m47 * m87 - m57 * m77) - transform._20 * (m37 * m87 - m57 * m67) + transform._30 * (m37 * m77 - m47 * m67)) * invdet;
+			var rotation__02 = (transform._01 * (m48 * m88 - m58 * m78) - transform._11 * (m38 * m88 - m58 * m68) + transform._31 * (m38 * m78 - m48 * m68)) * invdet;
+			var rotation__12 = -(transform._00 * (m49 * m89 - m59 * m79) - transform._10 * (m39 * m89 - m59 * m69) + transform._30 * (m39 * m79 - m49 * m69)) * invdet;
+			var rotation__22 = (transform._00 * (m410 * m810 - m510 * m710) - transform._10 * (m310 * m810 - m510 * m610) + transform._30 * (m310 * m710 - m410 * m610)) * invdet;
+			var rotation__32 = -(transform._00 * (m411 * m811 - m511 * m711) - transform._10 * (m311 * m811 - m511 * m611) + transform._30 * (m311 * m711 - m411 * m611)) * invdet;
+			var rotation__03 = -(transform._01 * (m412 * m812 - m512 * m712) - transform._11 * (m312 * m812 - m512 * m612) + transform._21 * (m312 * m712 - m412 * m612)) * invdet;
+			var rotation__13 = (transform._00 * (m413 * m813 - m513 * m713) - transform._10 * (m313 * m813 - m513 * m613) + transform._20 * (m313 * m713 - m413 * m613)) * invdet;
+			var rotation__23 = -(transform._00 * (m414 * m814 - m514 * m714) - transform._10 * (m314 * m814 - m514 * m614) + transform._20 * (m314 * m714 - m414 * m614)) * invdet;
+			var rotation__33 = (transform._00 * (m415 * m815 - m515 * m715) - transform._10 * (m315 * m815 - m515 * m615) + transform._20 * (m315 * m715 - m415 * m615)) * invdet;
+			rotation__32 = 0;
+			rotation__31 = rotation__32;
+			rotation__30 = rotation__31;
+			var _this1 = this.transform;
+			var _this2 = this.transform;
+			var _10 = _this2._00 * rotation__10 + _this2._10 * rotation__11 + _this2._20 * rotation__12 + _this2._30 * rotation__13;
+			var _20 = _this2._00 * rotation__20 + _this2._10 * rotation__21 + _this2._20 * rotation__22 + _this2._30 * rotation__23;
+			var _30 = _this2._00 * rotation__30 + _this2._10 * rotation__31 + _this2._20 * rotation__32 + _this2._30 * rotation__33;
+			var _11 = _this2._01 * rotation__10 + _this2._11 * rotation__11 + _this2._21 * rotation__12 + _this2._31 * rotation__13;
+			var _21 = _this2._01 * rotation__20 + _this2._11 * rotation__21 + _this2._21 * rotation__22 + _this2._31 * rotation__23;
+			var _31 = _this2._01 * rotation__30 + _this2._11 * rotation__31 + _this2._21 * rotation__32 + _this2._31 * rotation__33;
+			var _12 = _this2._02 * rotation__10 + _this2._12 * rotation__11 + _this2._22 * rotation__12 + _this2._32 * rotation__13;
+			var _22 = _this2._02 * rotation__20 + _this2._12 * rotation__21 + _this2._22 * rotation__22 + _this2._32 * rotation__23;
+			var _32 = _this2._02 * rotation__30 + _this2._12 * rotation__31 + _this2._22 * rotation__32 + _this2._32 * rotation__33;
+			var _13 = _this2._03 * rotation__10 + _this2._13 * rotation__11 + _this2._23 * rotation__12 + _this2._33 * rotation__13;
+			var _23 = _this2._03 * rotation__20 + _this2._13 * rotation__21 + _this2._23 * rotation__22 + _this2._33 * rotation__23;
+			var _33 = _this2._03 * rotation__30 + _this2._13 * rotation__31 + _this2._23 * rotation__32 + _this2._33 * rotation__33;
+			_this1._00 = _this2._00 * rotation__00 + _this2._10 * rotation__01 + _this2._20 * rotation__02 + _this2._30 * rotation__03;
+			_this1._10 = _10;
+			_this1._20 = _20;
+			_this1._30 = _30;
+			_this1._01 = _this2._01 * rotation__00 + _this2._11 * rotation__01 + _this2._21 * rotation__02 + _this2._31 * rotation__03;
+			_this1._11 = _11;
+			_this1._21 = _21;
+			_this1._31 = _31;
+			_this1._02 = _this2._02 * rotation__00 + _this2._12 * rotation__01 + _this2._22 * rotation__02 + _this2._32 * rotation__03;
+			_this1._12 = _12;
+			_this1._22 = _22;
+			_this1._32 = _32;
+			_this1._03 = _this2._03 * rotation__00 + _this2._13 * rotation__01 + _this2._23 * rotation__02 + _this2._33 * rotation__03;
+			_this1._13 = _13;
+			_this1._23 = _23;
+			_this1._33 = _33;
+		}
+		if(this.rotation3d != null) {
+			var _this3 = this.transform;
+			var _this4 = this.transform;
+			var m = this.rotation3d;
+			var _101 = _this4._00 * m._10 + _this4._10 * m._11 + _this4._20 * m._12 + _this4._30 * m._13;
+			var _201 = _this4._00 * m._20 + _this4._10 * m._21 + _this4._20 * m._22 + _this4._30 * m._23;
+			var _301 = _this4._00 * m._30 + _this4._10 * m._31 + _this4._20 * m._32 + _this4._30 * m._33;
+			var _01 = _this4._01 * m._00 + _this4._11 * m._01 + _this4._21 * m._02 + _this4._31 * m._03;
+			var _111 = _this4._01 * m._10 + _this4._11 * m._11 + _this4._21 * m._12 + _this4._31 * m._13;
+			var _211 = _this4._01 * m._20 + _this4._11 * m._21 + _this4._21 * m._22 + _this4._31 * m._23;
+			var _311 = _this4._01 * m._30 + _this4._11 * m._31 + _this4._21 * m._32 + _this4._31 * m._33;
+			var _02 = _this4._02 * m._00 + _this4._12 * m._01 + _this4._22 * m._02 + _this4._32 * m._03;
+			var _121 = _this4._02 * m._10 + _this4._12 * m._11 + _this4._22 * m._12 + _this4._32 * m._13;
+			var _221 = _this4._02 * m._20 + _this4._12 * m._21 + _this4._22 * m._22 + _this4._32 * m._23;
+			var _321 = _this4._02 * m._30 + _this4._12 * m._31 + _this4._22 * m._32 + _this4._32 * m._33;
+			var _03 = _this4._03 * m._00 + _this4._13 * m._01 + _this4._23 * m._02 + _this4._33 * m._03;
+			var _131 = _this4._03 * m._10 + _this4._13 * m._11 + _this4._23 * m._12 + _this4._33 * m._13;
+			var _231 = _this4._03 * m._20 + _this4._13 * m._21 + _this4._23 * m._22 + _this4._33 * m._23;
+			var _331 = _this4._03 * m._30 + _this4._13 * m._31 + _this4._23 * m._32 + _this4._33 * m._33;
+			_this3._00 = _this4._00 * m._00 + _this4._10 * m._01 + _this4._20 * m._02 + _this4._30 * m._03;
+			_this3._10 = _101;
+			_this3._20 = _201;
+			_this3._30 = _301;
+			_this3._01 = _01;
+			_this3._11 = _111;
+			_this3._21 = _211;
+			_this3._31 = _311;
+			_this3._02 = _02;
+			_this3._12 = _121;
+			_this3._22 = _221;
+			_this3._32 = _321;
+			_this3._03 = _03;
+			_this3._13 = _131;
+			_this3._23 = _231;
+			_this3._33 = _331;
+		}
+		var m1 = this.transform;
+		var _00 = transform._00 * m1._00 + transform._10 * m1._01 + transform._20 * m1._02 + transform._30 * m1._03;
+		var _102 = transform._00 * m1._10 + transform._10 * m1._11 + transform._20 * m1._12 + transform._30 * m1._13;
+		var _202 = transform._00 * m1._20 + transform._10 * m1._21 + transform._20 * m1._22 + transform._30 * m1._23;
+		var _302 = transform._00 * m1._30 + transform._10 * m1._31 + transform._20 * m1._32 + transform._30 * m1._33;
+		var _011 = transform._01 * m1._00 + transform._11 * m1._01 + transform._21 * m1._02 + transform._31 * m1._03;
+		var _112 = transform._01 * m1._10 + transform._11 * m1._11 + transform._21 * m1._12 + transform._31 * m1._13;
+		var _212 = transform._01 * m1._20 + transform._11 * m1._21 + transform._21 * m1._22 + transform._31 * m1._23;
+		var _312 = transform._01 * m1._30 + transform._11 * m1._31 + transform._21 * m1._32 + transform._31 * m1._33;
+		var _021 = transform._02 * m1._00 + transform._12 * m1._01 + transform._22 * m1._02 + transform._32 * m1._03;
+		var _122 = transform._02 * m1._10 + transform._12 * m1._11 + transform._22 * m1._12 + transform._32 * m1._13;
+		var _222 = transform._02 * m1._20 + transform._12 * m1._21 + transform._22 * m1._22 + transform._32 * m1._23;
+		var _322 = transform._02 * m1._30 + transform._12 * m1._31 + transform._22 * m1._32 + transform._32 * m1._33;
 		var drawArea = this.animationData.frames[this.timeline.currentFrame].drawArea;
 		if(drawArea.maxX != 16) {
 			drawArea.minX = drawArea.minX;
@@ -4074,9 +4472,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x = 0;
 		var multvec_y = 0;
 		var multvec_z = 0;
-		multvec_x = _00 * value_x + _10 * value_y + _20 * value_z + _30 * value_w;
-		multvec_y = _01 * value_x + _11 * value_y + _21 * value_z + _31 * value_w;
-		multvec_z = _02 * value_x + _12 * value_y + _22 * value_z + _32 * value_w;
+		multvec_x = _00 * value_x + _102 * value_y + _202 * value_z + _302 * value_w;
+		multvec_y = _011 * value_x + _112 * value_y + _212 * value_z + _312 * value_w;
+		multvec_z = _021 * value_x + _122 * value_y + _222 * value_z + _322 * value_w;
 		if(area.min.x > multvec_x) {
 			area.min.x = multvec_x;
 		}
@@ -4111,9 +4509,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x1 = 0;
 		var multvec_y1 = 0;
 		var multvec_z1 = 0;
-		multvec_x1 = _00 * value_x1 + _10 * value_y1 + _20 * value_z1 + _30 * value_w1;
-		multvec_y1 = _01 * value_x1 + _11 * value_y1 + _21 * value_z1 + _31 * value_w1;
-		multvec_z1 = _02 * value_x1 + _12 * value_y1 + _22 * value_z1 + _32 * value_w1;
+		multvec_x1 = _00 * value_x1 + _102 * value_y1 + _202 * value_z1 + _302 * value_w1;
+		multvec_y1 = _011 * value_x1 + _112 * value_y1 + _212 * value_z1 + _312 * value_w1;
+		multvec_z1 = _021 * value_x1 + _122 * value_y1 + _222 * value_z1 + _322 * value_w1;
 		if(area.min.x > multvec_x1) {
 			area.min.x = multvec_x1;
 		}
@@ -4148,9 +4546,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x2 = 0;
 		var multvec_y2 = 0;
 		var multvec_z2 = 0;
-		multvec_x2 = _00 * value_x2 + _10 * value_y2 + _20 * value_z2 + _30 * value_w2;
-		multvec_y2 = _01 * value_x2 + _11 * value_y2 + _21 * value_z2 + _31 * value_w2;
-		multvec_z2 = _02 * value_x2 + _12 * value_y2 + _22 * value_z2 + _32 * value_w2;
+		multvec_x2 = _00 * value_x2 + _102 * value_y2 + _202 * value_z2 + _302 * value_w2;
+		multvec_y2 = _011 * value_x2 + _112 * value_y2 + _212 * value_z2 + _312 * value_w2;
+		multvec_z2 = _021 * value_x2 + _122 * value_y2 + _222 * value_z2 + _322 * value_w2;
 		if(area.min.x > multvec_x2) {
 			area.min.x = multvec_x2;
 		}
@@ -4185,9 +4583,9 @@ com_gEngine_display_Sprite.prototype = {
 		var multvec_x3 = 0;
 		var multvec_y3 = 0;
 		var multvec_z3 = 0;
-		multvec_x3 = _00 * value_x3 + _10 * value_y3 + _20 * value_z3 + _30 * value_w3;
-		multvec_y3 = _01 * value_x3 + _11 * value_y3 + _21 * value_z3 + _31 * value_w3;
-		multvec_z3 = _02 * value_x3 + _12 * value_y3 + _22 * value_z3 + _32 * value_w3;
+		multvec_x3 = _00 * value_x3 + _102 * value_y3 + _202 * value_z3 + _302 * value_w3;
+		multvec_y3 = _011 * value_x3 + _112 * value_y3 + _212 * value_z3 + _312 * value_w3;
+		multvec_z3 = _021 * value_x3 + _122 * value_y3 + _222 * value_z3 + _322 * value_w3;
 		if(area.min.x > multvec_x3) {
 			area.min.x = multvec_x3;
 		}
@@ -4287,19 +4685,36 @@ com_gEngine_display_Stage.prototype = {
 	,__class__: com_gEngine_display_Stage
 };
 var com_gEngine_display_StaticLayer = function() {
-	this.identity = new kha_math_FastMatrix4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
 	com_gEngine_display_Layer.call(this);
+	this.offset = new kha_math_FastMatrix4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
 };
 $hxClasses["com.gEngine.display.StaticLayer"] = com_gEngine_display_StaticLayer;
 com_gEngine_display_StaticLayer.__name__ = "com.gEngine.display.StaticLayer";
 com_gEngine_display_StaticLayer.__super__ = com_gEngine_display_Layer;
 com_gEngine_display_StaticLayer.prototype = $extend(com_gEngine_display_Layer.prototype,{
-	identity: null
+	offset: null
 	,render: function(paintMode,transform) {
 		paintMode.render();
 		var proj = paintMode.camera.projection;
-		paintMode.camera.projection = paintMode.camera.screenTransform;
-		com_gEngine_display_Layer.prototype.render.call(this,paintMode,this.identity);
+		paintMode.camera.projection = paintMode.camera.orthogonal;
+		var _this = this.offset;
+		_this._00 = 1;
+		_this._10 = 0;
+		_this._20 = 0;
+		_this._30 = -paintMode.camera.width * 0.5;
+		_this._01 = 0;
+		_this._11 = 1;
+		_this._21 = 0;
+		_this._31 = -paintMode.camera.height * 0.5;
+		_this._02 = 0;
+		_this._12 = 0;
+		_this._22 = 1;
+		_this._32 = 0;
+		_this._03 = 0;
+		_this._13 = 0;
+		_this._23 = 0;
+		_this._33 = 1;
+		com_gEngine_display_Layer.prototype.render.call(this,paintMode,this.offset);
 		paintMode.render();
 		paintMode.camera.projection = proj;
 	}
@@ -4309,6 +4724,7 @@ var com_gEngine_display_Text = function(type) {
 	this.bakedQuadCache = new kha_AlignedQuad();
 	this.sourceFontSize = 0;
 	this.fontSize = 0;
+	this.text = "";
 	com_gEngine_display_Layer.call(this);
 	this.mLetters = [];
 	this.mType = type;
@@ -4359,7 +4775,7 @@ com_gEngine_display_Text.prototype = $extend(com_gEngine_display_Layer.prototype
 		var fontSize = Math.round(this.fontSize / this.sourceFontSize * this.sourceFontSize);
 		while(i < this.text.length) {
 			if(this.text.charAt(i) == "\n") {
-				i += 2;
+				++i;
 				ypos += fontSize * 0.8;
 				xpos = 0;
 				this.bakedQuadCache.xadvance = 0;
@@ -4371,6 +4787,7 @@ com_gEngine_display_Text.prototype = $extend(com_gEngine_display_Layer.prototype
 				if(this.mLetters.length <= counter) {
 					displayLetter = new com_gEngine_display_Sprite(this.mType);
 					displayLetter.set_smooth(this.smooth);
+					displayLetter.colorMultiplication(((this.color & 16711680) >>> 16) * 0.00392156862745098,((this.color & 65280) >>> 8) * 0.00392156862745098,(this.color & 255) * 0.00392156862745098,(this.color >>> 24) * 0.00392156862745098);
 					this.addChild(displayLetter);
 					this.mLetters.push(displayLetter);
 				} else {
@@ -4392,7 +4809,6 @@ com_gEngine_display_Text.prototype = $extend(com_gEngine_display_Layer.prototype
 		var _g = counter;
 		var _g1 = this.mLetters.length;
 		while(_g < _g1) this.mLetters[_g++].removeFromParent();
-		this.set_color(this.color);
 		return aText;
 	}
 	,width: function() {
@@ -4452,6 +4868,7 @@ var com_gEngine_helper_Timeline = function(frameRate,totalFrames,labels) {
 	this.currentFrame = 0;
 	this.frameSkiped = 0;
 	this.frameRate = frameRate;
+	this.lastFrame = totalFrames - 1;
 	this.totalFrames = totalFrames;
 	if(totalFrames == 1) {
 		this.playing = false;
@@ -4600,6 +5017,9 @@ com_gEngine_painters_IPainter.prototype = {
 	,vertexCount: null
 	,releaseTexture: null
 	,adjustRenderArea: null
+	,getVertexBuffer: null
+	,getVertexDataCounter: null
+	,setVertexDataCounter: null
 	,destroy: null
 	,setProjection: null
 	,textureID: null
@@ -4756,7 +5176,7 @@ var com_gEngine_painters_Painter = function(autoDestroy,blend,depthWrite,clockWi
 		autoDestroy = true;
 	}
 	this.mipMapFilter = 0;
-	this.filter = 0;
+	this.filter = 1;
 	this.textureID = -1;
 	this.counter = 0;
 	this.resolution = 1;
@@ -4776,7 +5196,8 @@ var com_gEngine_painters_Painter = function(autoDestroy,blend,depthWrite,clockWi
 	this.depthWrite = depthWrite;
 	this.clockWise = clockWise;
 	this.initShaders(blend);
-	this.buffer = this.vertexBuffer.lock();
+	this.createBuffers();
+	this.buffer = this.downloadVertexBuffer();
 };
 $hxClasses["com.gEngine.painters.Painter"] = com_gEngine_painters_Painter;
 com_gEngine_painters_Painter.__name__ = "com.gEngine.painters.Painter";
@@ -4801,6 +5222,7 @@ com_gEngine_painters_Painter.prototype = {
 	,textureID: null
 	,filter: null
 	,mipMapFilter: null
+	,structure: null
 	,depthWrite: null
 	,clockWise: null
 	,write: function(value) {
@@ -4818,7 +5240,7 @@ com_gEngine_painters_Painter.prototype = {
 		this.canvasWidth = canvas.get_width();
 		this.canvasHeight = canvas.get_height();
 		var g = canvas.get_g4();
-		this.vertexBuffer.unlock(vertexCount);
+		this.uploadVertexBuffer(vertexCount);
 		if(clear) {
 			g.clear(kha__$Color_Color_$Impl_$.fromFloats(this.red,this.green,this.blue,this.alpha),1);
 		}
@@ -4829,7 +5251,7 @@ com_gEngine_painters_Painter.prototype = {
 		g.setTextureParameters(this.textureConstantID,2,2,this.filter,this.filter,this.mipMapFilter);
 		g.drawIndexedVertices(0,vertexCount * 1.5 | 0);
 		this.unsetTextures(g);
-		this.buffer = this.vertexBuffer.lock();
+		this.buffer = this.downloadVertexBuffer();
 		++com_gEngine_GEngine.drawCount;
 		this.counter = 0;
 	}
@@ -4838,13 +5260,13 @@ com_gEngine_painters_Painter.prototype = {
 	}
 	,initShaders: function(blend) {
 		this.pipeline = new kha_graphics4_PipelineState();
-		this.setShaders(this.pipeline);
-		var structure = new kha_graphics4_VertexStructure();
-		this.defineVertexStructure(structure);
-		this.pipeline.inputLayout = [structure];
+		this.structure = new kha_graphics4_VertexStructure();
+		this.defineVertexStructure(this.structure);
+		this.pipeline.inputLayout = [this.structure];
 		this.pipeline.depthMode = 4;
 		this.pipeline.cullMode = this.clockWise;
 		this.pipeline.depthWrite = this.depthWrite;
+		this.setShaders(this.pipeline);
 		var pipeline = this.pipeline;
 		pipeline.blendOperation = blend.blendOperation;
 		pipeline.blendSource = blend.blendSource;
@@ -4853,14 +5275,13 @@ com_gEngine_painters_Painter.prototype = {
 		pipeline.alphaBlendDestination = blend.alphaBlendDestination;
 		this.pipeline.compile();
 		this.getConstantLocations(this.pipeline);
-		this.vertexBuffer = new kha_graphics4_VertexBuffer(4000,structure,1);
-		this.createIndexBuffer();
 	}
 	,getConstantLocations: function(pipeline) {
 		this.mvpID = pipeline.getConstantLocation("projectionMatrix");
 		this.textureConstantID = pipeline.getTextureUnit("tex");
 	}
-	,createIndexBuffer: function() {
+	,createBuffers: function() {
+		this.vertexBuffer = new kha_graphics4_VertexBuffer(4000,this.structure,1);
 		this.indexBuffer = new kha_graphics4_IndexBuffer(6000,0);
 		var iData = this.indexBuffer.lock();
 		var _g = 0;
@@ -4889,6 +5310,12 @@ com_gEngine_painters_Painter.prototype = {
 	}
 	,unsetTextures: function(g) {
 		g.setTexture(this.textureConstantID,null);
+	}
+	,downloadVertexBuffer: function() {
+		return this.vertexBuffer.lock();
+	}
+	,uploadVertexBuffer: function(count) {
+		this.vertexBuffer.unlock(count);
 	}
 	,destroy: function() {
 		this.vertexBuffer.delete();
@@ -4942,11 +5369,14 @@ com_gEngine_painters_PainterAlpha.prototype = $extend(com_gEngine_painters_Paint
 	}
 	,__class__: com_gEngine_painters_PainterAlpha
 });
-var com_gEngine_painters_PainterColorTransform = function(autoDestroy,blend) {
+var com_gEngine_painters_PainterColorTransform = function(autoDestroy,blend,depthWrite) {
+	if(depthWrite == null) {
+		depthWrite = false;
+	}
 	if(autoDestroy == null) {
 		autoDestroy = true;
 	}
-	com_gEngine_painters_Painter.call(this,autoDestroy,blend);
+	com_gEngine_painters_Painter.call(this,autoDestroy,blend,depthWrite);
 	this.dataPerVertex = 13;
 };
 $hxClasses["com.gEngine.painters.PainterColorTransform"] = com_gEngine_painters_PainterColorTransform;
@@ -5224,6 +5654,9 @@ com_imageAtlas_AtlasGenerator.generate = function(width,height,bitmaps,separatio
 	if(separation == null) {
 		separation = 2;
 	}
+	if(com_imageAtlas_AtlasGenerator.clearPipeline == null) {
+		com_imageAtlas_AtlasGenerator.clearPipeline = com_imageAtlas_AtlasGenerator.createClearPipeline();
+	}
 	bitmaps.sort(com_imageAtlas_AtlasGenerator.sortArea);
 	var atlasImage = kha_Image.createRenderTarget(width,height,0,0,0);
 	var realWidth = atlasImage.get_realWidth();
@@ -5236,13 +5669,26 @@ com_imageAtlas_AtlasGenerator.generate = function(width,height,bitmaps,separatio
 		var bitmap = bitmaps[_g];
 		++_g;
 		var rectangle = atlasMap.insertImage(bitmap);
-		g.set_pipeline(bitmap.specialPipeline);
+		if(bitmap.hasPreRender) {
+			g.end();
+			g.begin(false);
+		}
+		if(bitmap.specialPipeline != null) {
+			g.set_pipeline(bitmap.specialPipeline);
+		} else {
+			g.set_pipeline(com_imageAtlas_AtlasGenerator.clearPipeline);
+		}
 		g.set_imageScaleQuality(1);
 		if(bitmap.hasMipMap) {
 			g.set_mipmapScaleQuality(1);
 		} else {
 			g.set_mipmapScaleQuality(0);
 		}
+		g.set_imageScaleQuality(0);
+		g.drawScaledSubImage(bitmap.image,bitmap.x * bitmap.scaleX,bitmap.y * bitmap.scaleY,bitmap.width * bitmap.scaleX,bitmap.height * bitmap.scaleY,rectangle.x - 1,rectangle.y,bitmap.width + 2,bitmap.height);
+		g.drawScaledSubImage(bitmap.image,bitmap.x * bitmap.scaleX,bitmap.y * bitmap.scaleY,bitmap.width * bitmap.scaleX,bitmap.height * bitmap.scaleY,rectangle.x,rectangle.y - 1,bitmap.width,bitmap.height + 2);
+		g.set_color(kha__$Color_Color_$Impl_$.fromFloats(1,1,1,1));
+		g.set_imageScaleQuality(1);
 		g.drawScaledSubImage(bitmap.image,bitmap.x * bitmap.scaleX,bitmap.y * bitmap.scaleY,bitmap.width * bitmap.scaleX,bitmap.height * bitmap.scaleY,rectangle.x,rectangle.y,bitmap.width,bitmap.height);
 		rectangle.x += bitmap.extrude;
 		rectangle.y += bitmap.extrude;
@@ -5279,7 +5725,17 @@ com_imageAtlas_AtlasGenerator.generate = function(width,height,bitmaps,separatio
 com_imageAtlas_AtlasGenerator.sortArea = function(b1,b2) {
 	return b2.width * b2.height - b1.width * b1.height | 0;
 };
+com_imageAtlas_AtlasGenerator.createClearPipeline = function() {
+	var shaderPipeline = kha_graphics4_Graphics2.createImagePipeline(kha_graphics4_Graphics2.createImageVertexStructure());
+	shaderPipeline.blendSource = 1;
+	shaderPipeline.blendDestination = 2;
+	shaderPipeline.alphaBlendSource = 1;
+	shaderPipeline.alphaBlendDestination = 2;
+	shaderPipeline.compile();
+	return shaderPipeline;
+};
 var com_imageAtlas_Bitmap = function() {
+	this.hasPreRender = false;
 	this.hasMipMap = false;
 	this.specialPipeline = null;
 	this.maxUV = new com_helpers_Point(1,1);
@@ -5308,6 +5764,7 @@ com_imageAtlas_Bitmap.prototype = {
 	,maxUV: null
 	,specialPipeline: null
 	,hasMipMap: null
+	,hasPreRender: null
 	,__class__: com_imageAtlas_Bitmap
 };
 var com_imageAtlas_ImageTree = function(width,height,imageSeparation) {
@@ -5610,7 +6067,7 @@ com_loading_basicResources_FontLoader.prototype = $extend(com_loading_basicResou
 		kha_Assets.loadFont(this.imageName,function(font) {
 			_gthis.fromKhaFont();
 			callback();
-		},null,{ fileName : "com/loading/basicResources/FontLoader.hx", lineNumber : 28, className : "com.loading.basicResources.FontLoader", methodName : "load"});
+		},null,{ fileName : "com/loading/basicResources/FontLoader.hx", lineNumber : 29, className : "com.loading.basicResources.FontLoader", methodName : "load"});
 	}
 	,loadLocal: function(callback) {
 		this.fromKhaFont();
@@ -5628,6 +6085,10 @@ com_loading_basicResources_FontLoader.prototype = $extend(com_loading_basicResou
 		var counter = 0;
 		if(com_loading_basicResources_FontLoader.pipeline == null) {
 			com_loading_basicResources_FontLoader.pipeline = kha_graphics4_Graphics2.createTextPipeline(kha_graphics4_Graphics2.createTextVertexStructure());
+			com_loading_basicResources_FontLoader.pipeline.blendSource = 3;
+			com_loading_basicResources_FontLoader.pipeline.blendDestination = 2;
+			com_loading_basicResources_FontLoader.pipeline.alphaBlendSource = 3;
+			com_loading_basicResources_FontLoader.pipeline.alphaBlendDestination = 2;
 			com_loading_basicResources_FontLoader.pipeline.compile();
 		}
 		while(true) {
@@ -21047,16 +21508,262 @@ levelObjects_LoopBackground.prototype = $extend(com_framework_utils_Entity.proto
 	,camera: null
 	,update: function(dt) {
 		com_framework_utils_Entity.prototype.update.call(this,dt);
-		var x = Math.floor(this.camera.screenToWorldX(-10) / this.tileWidth);
-		var y = Math.floor(this.camera.screenToWorldY(-10) / this.tileHeight);
+		var _this = this.camera;
+		var homogeneousTargetX = -10 / _this.width * 2 - 1;
+		var homogeneousTargetY = kha_Image.renderTargetsInvertedY() ? -10 / _this.height * 2 - 1 : 1 - -10 / _this.height * 2;
+		var transform;
+		if(_this.projectionIsOrthogonal) {
+			homogeneousTargetX = -10 - _this.width * 0.5;
+			homogeneousTargetY = -10 - _this.height * 0.5;
+			var _this1 = _this.view;
+			var m3 = _this1._12;
+			var m4 = _this1._22;
+			var m5 = _this1._32;
+			var m6 = _this1._13;
+			var m7 = _this1._23;
+			var m8 = _this1._33;
+			var c00 = _this1._11 * (m4 * m8 - m5 * m7) - _this1._21 * (m3 * m8 - m5 * m6) + _this1._31 * (m3 * m7 - m4 * m6);
+			var m31 = _this1._12;
+			var m41 = _this1._22;
+			var m51 = _this1._32;
+			var m61 = _this1._13;
+			var m71 = _this1._23;
+			var m81 = _this1._33;
+			var c01 = _this1._10 * (m41 * m81 - m51 * m71) - _this1._20 * (m31 * m81 - m51 * m61) + _this1._30 * (m31 * m71 - m41 * m61);
+			var m32 = _this1._11;
+			var m42 = _this1._21;
+			var m52 = _this1._31;
+			var m62 = _this1._13;
+			var m72 = _this1._23;
+			var m82 = _this1._33;
+			var c02 = _this1._10 * (m42 * m82 - m52 * m72) - _this1._20 * (m32 * m82 - m52 * m62) + _this1._30 * (m32 * m72 - m42 * m62);
+			var m33 = _this1._11;
+			var m43 = _this1._21;
+			var m53 = _this1._31;
+			var m63 = _this1._12;
+			var m73 = _this1._22;
+			var m83 = _this1._32;
+			var c03 = _this1._10 * (m43 * m83 - m53 * m73) - _this1._20 * (m33 * m83 - m53 * m63) + _this1._30 * (m33 * m73 - m43 * m63);
+			var det = _this1._00 * c00 - _this1._01 * c01 + _this1._02 * c02 - _this1._03 * c03;
+			if(Math.abs(det) < 0.000001) {
+				throw new js__$Boot_HaxeError("determinant is too small");
+			}
+			var m34 = _this1._02;
+			var m44 = _this1._22;
+			var m54 = _this1._32;
+			var m64 = _this1._03;
+			var m74 = _this1._23;
+			var m84 = _this1._33;
+			var m35 = _this1._02;
+			var m45 = _this1._22;
+			var m55 = _this1._32;
+			var m65 = _this1._03;
+			var m75 = _this1._23;
+			var m85 = _this1._33;
+			var m36 = _this1._01;
+			var m46 = _this1._21;
+			var m56 = _this1._31;
+			var m66 = _this1._03;
+			var m76 = _this1._23;
+			var m86 = _this1._33;
+			var m37 = _this1._01;
+			var m47 = _this1._21;
+			var m57 = _this1._31;
+			var m67 = _this1._02;
+			var m77 = _this1._22;
+			var m87 = _this1._32;
+			var m38 = _this1._02;
+			var m48 = _this1._12;
+			var m58 = _this1._32;
+			var m68 = _this1._03;
+			var m78 = _this1._13;
+			var m88 = _this1._33;
+			var m39 = _this1._02;
+			var m49 = _this1._12;
+			var m59 = _this1._32;
+			var m69 = _this1._03;
+			var m79 = _this1._13;
+			var m89 = _this1._33;
+			var m310 = _this1._01;
+			var m410 = _this1._11;
+			var m510 = _this1._31;
+			var m610 = _this1._03;
+			var m710 = _this1._13;
+			var m810 = _this1._33;
+			var m311 = _this1._01;
+			var m411 = _this1._11;
+			var m511 = _this1._31;
+			var m611 = _this1._02;
+			var m711 = _this1._12;
+			var m811 = _this1._32;
+			var m312 = _this1._02;
+			var m412 = _this1._12;
+			var m512 = _this1._22;
+			var m612 = _this1._03;
+			var m712 = _this1._13;
+			var m812 = _this1._23;
+			var m313 = _this1._02;
+			var m413 = _this1._12;
+			var m513 = _this1._22;
+			var m613 = _this1._03;
+			var m713 = _this1._13;
+			var m813 = _this1._23;
+			var m314 = _this1._01;
+			var m414 = _this1._11;
+			var m514 = _this1._21;
+			var m614 = _this1._03;
+			var m714 = _this1._13;
+			var m814 = _this1._23;
+			var m315 = _this1._01;
+			var m415 = _this1._11;
+			var m515 = _this1._21;
+			var m615 = _this1._02;
+			var m715 = _this1._12;
+			var m815 = _this1._22;
+			var invdet = 1.0 / det;
+			transform = new kha_math_FastMatrix4(c00 * invdet,-c01 * invdet,c02 * invdet,-c03 * invdet,-(_this1._01 * (m44 * m84 - m54 * m74) - _this1._21 * (m34 * m84 - m54 * m64) + _this1._31 * (m34 * m74 - m44 * m64)) * invdet,(_this1._00 * (m45 * m85 - m55 * m75) - _this1._20 * (m35 * m85 - m55 * m65) + _this1._30 * (m35 * m75 - m45 * m65)) * invdet,-(_this1._00 * (m46 * m86 - m56 * m76) - _this1._20 * (m36 * m86 - m56 * m66) + _this1._30 * (m36 * m76 - m46 * m66)) * invdet,(_this1._00 * (m47 * m87 - m57 * m77) - _this1._20 * (m37 * m87 - m57 * m67) + _this1._30 * (m37 * m77 - m47 * m67)) * invdet,(_this1._01 * (m48 * m88 - m58 * m78) - _this1._11 * (m38 * m88 - m58 * m68) + _this1._31 * (m38 * m78 - m48 * m68)) * invdet,-(_this1._00 * (m49 * m89 - m59 * m79) - _this1._10 * (m39 * m89 - m59 * m69) + _this1._30 * (m39 * m79 - m49 * m69)) * invdet,(_this1._00 * (m410 * m810 - m510 * m710) - _this1._10 * (m310 * m810 - m510 * m610) + _this1._30 * (m310 * m710 - m410 * m610)) * invdet,-(_this1._00 * (m411 * m811 - m511 * m711) - _this1._10 * (m311 * m811 - m511 * m611) + _this1._30 * (m311 * m711 - m411 * m611)) * invdet,-(_this1._01 * (m412 * m812 - m512 * m712) - _this1._11 * (m312 * m812 - m512 * m612) + _this1._21 * (m312 * m712 - m412 * m612)) * invdet,(_this1._00 * (m413 * m813 - m513 * m713) - _this1._10 * (m313 * m813 - m513 * m613) + _this1._20 * (m313 * m713 - m413 * m613)) * invdet,-(_this1._00 * (m414 * m814 - m514 * m714) - _this1._10 * (m314 * m814 - m514 * m614) + _this1._20 * (m314 * m714 - m414 * m614)) * invdet,(_this1._00 * (m415 * m815 - m515 * m715) - _this1._10 * (m315 * m815 - m515 * m615) + _this1._20 * (m315 * m715 - m415 * m615)) * invdet);
+		} else {
+			var _this2 = _this.projection;
+			var m = _this.view;
+			var _00 = _this2._00 * m._00 + _this2._10 * m._01 + _this2._20 * m._02 + _this2._30 * m._03;
+			var _10 = _this2._00 * m._10 + _this2._10 * m._11 + _this2._20 * m._12 + _this2._30 * m._13;
+			var _20 = _this2._00 * m._20 + _this2._10 * m._21 + _this2._20 * m._22 + _this2._30 * m._23;
+			var _30 = _this2._00 * m._30 + _this2._10 * m._31 + _this2._20 * m._32 + _this2._30 * m._33;
+			var _01 = _this2._01 * m._00 + _this2._11 * m._01 + _this2._21 * m._02 + _this2._31 * m._03;
+			var _11 = _this2._01 * m._10 + _this2._11 * m._11 + _this2._21 * m._12 + _this2._31 * m._13;
+			var _21 = _this2._01 * m._20 + _this2._11 * m._21 + _this2._21 * m._22 + _this2._31 * m._23;
+			var _31 = _this2._01 * m._30 + _this2._11 * m._31 + _this2._21 * m._32 + _this2._31 * m._33;
+			var _02 = _this2._02 * m._00 + _this2._12 * m._01 + _this2._22 * m._02 + _this2._32 * m._03;
+			var _12 = _this2._02 * m._10 + _this2._12 * m._11 + _this2._22 * m._12 + _this2._32 * m._13;
+			var _22 = _this2._02 * m._20 + _this2._12 * m._21 + _this2._22 * m._22 + _this2._32 * m._23;
+			var _32 = _this2._02 * m._30 + _this2._12 * m._31 + _this2._22 * m._32 + _this2._32 * m._33;
+			var _03 = _this2._03 * m._00 + _this2._13 * m._01 + _this2._23 * m._02 + _this2._33 * m._03;
+			var _13 = _this2._03 * m._10 + _this2._13 * m._11 + _this2._23 * m._12 + _this2._33 * m._13;
+			var _23 = _this2._03 * m._20 + _this2._13 * m._21 + _this2._23 * m._22 + _this2._33 * m._23;
+			var _33 = _this2._03 * m._30 + _this2._13 * m._31 + _this2._23 * m._32 + _this2._33 * m._33;
+			var c001 = _11 * (_22 * _33 - _32 * _23) - _21 * (_12 * _33 - _32 * _13) + _31 * (_12 * _23 - _22 * _13);
+			var c011 = _10 * (_22 * _33 - _32 * _23) - _20 * (_12 * _33 - _32 * _13) + _30 * (_12 * _23 - _22 * _13);
+			var c021 = _10 * (_21 * _33 - _31 * _23) - _20 * (_11 * _33 - _31 * _13) + _30 * (_11 * _23 - _21 * _13);
+			var c031 = _10 * (_21 * _32 - _31 * _22) - _20 * (_11 * _32 - _31 * _12) + _30 * (_11 * _22 - _21 * _12);
+			var det1 = _00 * c001 - _01 * c011 + _02 * c021 - _03 * c031;
+			if(Math.abs(det1) < 0.000001) {
+				throw new js__$Boot_HaxeError("determinant is too small");
+			}
+			var invdet1 = 1.0 / det1;
+			transform = new kha_math_FastMatrix4(c001 * invdet1,-c011 * invdet1,c021 * invdet1,-c031 * invdet1,-(_01 * (_22 * _33 - _32 * _23) - _21 * (_02 * _33 - _32 * _03) + _31 * (_02 * _23 - _22 * _03)) * invdet1,(_00 * (_22 * _33 - _32 * _23) - _20 * (_02 * _33 - _32 * _03) + _30 * (_02 * _23 - _22 * _03)) * invdet1,-(_00 * (_21 * _33 - _31 * _23) - _20 * (_01 * _33 - _31 * _03) + _30 * (_01 * _23 - _21 * _03)) * invdet1,(_00 * (_21 * _32 - _31 * _22) - _20 * (_01 * _32 - _31 * _02) + _30 * (_01 * _22 - _21 * _02)) * invdet1,(_01 * (_12 * _33 - _32 * _13) - _11 * (_02 * _33 - _32 * _03) + _31 * (_02 * _13 - _12 * _03)) * invdet1,-(_00 * (_12 * _33 - _32 * _13) - _10 * (_02 * _33 - _32 * _03) + _30 * (_02 * _13 - _12 * _03)) * invdet1,(_00 * (_11 * _33 - _31 * _13) - _10 * (_01 * _33 - _31 * _03) + _30 * (_01 * _13 - _11 * _03)) * invdet1,-(_00 * (_11 * _32 - _31 * _12) - _10 * (_01 * _32 - _31 * _02) + _30 * (_01 * _12 - _11 * _02)) * invdet1,-(_01 * (_12 * _23 - _22 * _13) - _11 * (_02 * _23 - _22 * _03) + _21 * (_02 * _13 - _12 * _03)) * invdet1,(_00 * (_12 * _23 - _22 * _13) - _10 * (_02 * _23 - _22 * _03) + _20 * (_02 * _13 - _12 * _03)) * invdet1,-(_00 * (_11 * _23 - _21 * _13) - _10 * (_01 * _23 - _21 * _03) + _20 * (_01 * _13 - _11 * _03)) * invdet1,(_00 * (_11 * _22 - _21 * _12) - _10 * (_01 * _22 - _21 * _02) + _20 * (_01 * _12 - _11 * _02)) * invdet1);
+		}
+		var x = homogeneousTargetX;
+		var y = homogeneousTargetY;
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		var value_x = x;
+		var value_y = y;
+		var value_z = -1;
+		var value_w = 1;
+		var farRaw_x = 0;
+		var farRaw_y = 0;
+		var farRaw_z = 0;
+		var farRaw_w = 1;
+		farRaw_x = transform._00 * value_x + transform._10 * value_y + transform._20 * value_z + transform._30 * value_w;
+		farRaw_y = transform._01 * value_x + transform._11 * value_y + transform._21 * value_z + transform._31 * value_w;
+		farRaw_z = transform._02 * value_x + transform._12 * value_y + transform._22 * value_z + transform._32 * value_w;
+		farRaw_w = transform._03 * value_x + transform._13 * value_y + transform._23 * value_z + transform._33 * value_w;
+		var x1 = homogeneousTargetX;
+		var y1 = homogeneousTargetY;
+		if(y1 == null) {
+			y1 = 0;
+		}
+		if(x1 == null) {
+			x1 = 0;
+		}
+		var value_x1 = x1;
+		var value_y1 = y1;
+		var value_z1 = 1;
+		var value_w1 = 1;
+		var nearRaw_x = 0;
+		var nearRaw_y = 0;
+		var nearRaw_z = 0;
+		var nearRaw_w = 1;
+		nearRaw_x = transform._00 * value_x1 + transform._10 * value_y1 + transform._20 * value_z1 + transform._30 * value_w1;
+		nearRaw_y = transform._01 * value_x1 + transform._11 * value_y1 + transform._21 * value_z1 + transform._31 * value_w1;
+		nearRaw_z = transform._02 * value_x1 + transform._12 * value_y1 + transform._22 * value_z1 + transform._32 * value_w1;
+		nearRaw_w = transform._03 * value_x1 + transform._13 * value_y1 + transform._23 * value_z1 + transform._33 * value_w1;
+		var value = 1 / farRaw_w;
+		var x2 = farRaw_x * value;
+		var y2 = farRaw_y * value;
+		var z = farRaw_z * value;
+		var w = farRaw_w * value;
+		if(w == null) {
+			w = 1;
+		}
+		if(z == null) {
+			z = 0;
+		}
+		if(y2 == null) {
+			y2 = 0;
+		}
+		if(x2 == null) {
+			x2 = 0;
+		}
+		var value1 = 1 / nearRaw_w;
+		var x3 = nearRaw_x * value1;
+		var y3 = nearRaw_y * value1;
+		var z1 = nearRaw_z * value1;
+		var w1 = nearRaw_w * value1;
+		if(w1 == null) {
+			w1 = 1;
+		}
+		if(z1 == null) {
+			z1 = 0;
+		}
+		if(y3 == null) {
+			y3 = 0;
+		}
+		if(x3 == null) {
+			x3 = 0;
+		}
+		var near_x = x3;
+		var near_y = y3;
+		var near_z = z1;
+		var x4 = x2 - near_x;
+		var y4 = y2 - near_y;
+		var z2 = z - near_z;
+		var w2 = w - w1;
+		if(w2 == null) {
+			w2 = 1;
+		}
+		if(z2 == null) {
+			z2 = 0;
+		}
+		if(y4 == null) {
+			y4 = 0;
+		}
+		if(x4 == null) {
+			x4 = 0;
+		}
+		var dir_z = z2;
+		var x5 = near_x + x4 * ((0 - near_z) / dir_z);
+		var y5 = near_y + y4 * ((0 - near_z) / dir_z);
+		if(y5 == null) {
+			y5 = 0;
+		}
+		if(x5 == null) {
+			x5 = 0;
+		}
+		var xInTiles = Math.floor(x5 / this.tileWidth);
+		var yInTiles = Math.floor(y5 / this.tileHeight);
 		var counter = 0;
 		var _g = 0;
 		var _g1 = this.sprites;
 		while(_g < _g1.length) {
 			var tile = _g1[_g];
 			++_g;
-			tile.x = (x + counter % 7 | 0) * this.tileWidth;
-			tile.y = (y + (counter / 7 | 0)) * this.tileHeight;
+			tile.x = (xInTiles + counter % 7 | 0) * this.tileWidth;
+			tile.y = (yInTiles + (counter / 7 | 0)) * this.tileHeight;
 			++counter;
 		}
 	}
